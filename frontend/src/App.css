@@ -1,0 +1,102 @@
+.app {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+h1 {
+  font-size: 2rem;
+  margin-bottom: 4px;
+}
+
+.tagline {
+  color: var(--text-muted, #888);
+  margin-bottom: 32px;
+}
+
+.query-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.query-form input {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: transparent;
+  color: inherit;
+}
+
+.query-form button {
+  padding: 12px 20px;
+  font-size: 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #6d5bd0;
+  color: white;
+  cursor: pointer;
+}
+
+.query-form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.error {
+  color: #e5484d;
+}
+
+.agent-message {
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.score {
+  font-size: 0.85rem;
+  color: #f5c518;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rationale {
+  font-size: 0.92rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.caveat {
+  font-size: 0.85rem;
+  color: #e0a030;
+  margin: 0;
+  line-height: 1.4;
+}

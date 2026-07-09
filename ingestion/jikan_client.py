@@ -33,3 +33,14 @@ def iter_anime(max_pages: int | None = None):
         if max_pages is not None and page >= max_pages:
             break
         page += 1
+
+
+def fetch_reviews(anime_id: int, max_reviews: int = 6) -> list[str]:
+    try:
+        data = _get(f"/anime/{anime_id}/reviews", params={"page": 1})
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            return []
+        raise
+    entries = data.get("data", [])[:max_reviews]
+    return [entry["review"] for entry in entries if entry.get("review")]

@@ -1,0 +1,203 @@
+"""Offline batch job: summarize review reception per anime using Claude Haiku (Batch API).
+
+Run: python -m ingestion.summarize_reception [--max-reviews N] [--reprocess-all]
+     python -m ingestion.summarize_reception --resume <batch_id>
+
+Fetches sampled reviews from Jikan, sends them to Claude Haiku via the Message Batches API
+to produce a short reception summary + sentiment ratio, and upserts into reception_signals.
+Idempotent — only processes anime missing a reception_signals row unless --reprocess-all.
+
+The Batch API is async (can take minutes to hours). If it hasn't finished by --poll-timeout,
+the batch id is printed so the job can be resumed later with --resume.
+"""
+
+import argparse
+import json
+import logging
+import time
+
+from sqlalchemy import select
+
+from app.db import SessionLocal
+from app.llm import SUMMARIZATION_MODEL, client
+from app.models.anime import Anime
+from app.models.reception import CommunityFlag, ReceptionSignal
+from ingestion.jikan_client import fetch_reviews
+from ingestion.transform import clean_text
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+MAX_REVIEW_CHARS = 600
+SYSTEM_PROMPT = (
+    "You analyze anime fan reviews to summarize community reception. "
+    "Given the anime title and a sample of user reviews, respond with ONLY a JSON object "
+    '(no other text) of the form {"summary": "...", "sentiment_ratio": 0.0} where summary is '
+    "a 1-2 sentence human-readable description of overall reception (mention notable praise "
+    "or criticism), and sentiment_ratio is a float from 0.0 (entirely negative) to 1.0 "
+    "(entirely positive) reflecting the balance of positive vs negative sentiment."
+)
+
+
+def derive_community_flag(sentiment_ratio: float | None) -> CommunityFlag:
+    if sentiment_ratio is None:
+        return CommunityFlag.none
+    if sentiment_ratio < 0.4:
+        return CommunityFlag.widely_criticized
+    if sentiment_ratio < 0.6:
+        return CommunityFlag.mixed
+    return CommunityFlag.none
+
+
+def build_batch_request(anime_id: int, title: str, reviews: list[str]) -> dict:
+    review_text = "\n\n".join(f"Review {i+1}: {r[:MAX_REVIEW_CHARS]}" for i, r in enumerate(reviews))
+    return {
+        "custom_id": str(anime_id),
+        "params": {
+            "model": SUMMARIZATION_MODEL,
+            "max_tokens": 300,
+            "system": SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": f"Anime: {title}\n\n{review_text}"}],
+        },
+    }
+
+
+def upsert_reception(db, anime_id: int, summary: str | None, sentiment_ratio: float | None) -> None:
+    flag = derive_community_flag(sentiment_ratio)
+    existing = db.get(ReceptionSignal, anime_id)
+    if existing:
+        existing.reception_summary = summary
+        existing.review_sentiment_ratio = sentiment_ratio
+        existing.community_flag = flag
+    else:
+        db.add(
+            ReceptionSignal(
+                anime_id=anime_id,
+                reception_summary=summary,
+                review_sentiment_ratio=sentiment_ratio,
+                community_flag=flag,
+            )
+        )
+
+
+def collect_review_texts(anime_id: int, max_reviews: int) -> list[str]:
+    raw_reviews = fetch_reviews(anime_id, max_reviews=max_reviews)
+    cleaned = [clean_text(r) for r in raw_reviews]
+    return [r for r in cleaned if r]
+
+
+def submit_batch(requests: list[dict]) -> str:
+    batch = client.messages.batches.create(requests=requests)
+    logger.info("Submitted batch %s with %d requests", batch.id, len(requests))
+    return batch.id
+
+
+def poll_batch(batch_id: str, poll_interval: int, poll_timeout: int) -> bool:
+    """Returns True if the batch ended within the timeout."""
+    waited = 0
+    while waited <= poll_timeout:
+        batch = client.messages.batches.retrieve(batch_id)
+        logger.info("Batch %s status: %s", batch_id, batch.processing_status)
+        if batch.processing_status == "ended":
+            return True
+        time.sleep(poll_interval)
+        waited += poll_interval
+    return False
+
+
+def extract_json(raw_text: str) -> dict:
+    """Haiku sometimes wraps JSON in a markdown code fence despite instructions not to."""
+    start, end = raw_text.find("{"), raw_text.rfind("}")
+    if start == -1 or end == -1:
+        raise json.JSONDecodeError("No JSON object found", raw_text, 0)
+    return json.loads(raw_text[start : end + 1])
+
+
+def apply_batch_results(db, batch_id: str) -> int:
+    processed = 0
+    for result in client.messages.batches.results(batch_id):
+        anime_id = int(result.custom_id)
+        if result.result.type != "succeeded":
+            logger.warning("Batch entry %s did not succeed: %s", anime_id, result.result.type)
+            continue
+        message = result.result.message
+        raw_text = "".join(block.text for block in message.content if block.type == "text")
+        try:
+            parsed = extract_json(raw_text)
+            upsert_reception(db, anime_id, parsed.get("summary"), parsed.get("sentiment_ratio"))
+            processed += 1
+        except (json.JSONDecodeError, KeyError) as exc:
+            logger.warning("Failed to parse result for anime %s: %s", anime_id, exc)
+    db.commit()
+    return processed
+
+
+def run(max_reviews: int, reprocess_all: bool, poll_interval: int, poll_timeout: int, resume_batch_id: str | None) -> None:
+    db = SessionLocal()
+    try:
+        if resume_batch_id:
+            ended = poll_batch(resume_batch_id, poll_interval, poll_timeout)
+            if not ended:
+                logger.info("Batch %s still not finished. Re-run with --resume %s later.", resume_batch_id, resume_batch_id)
+                return
+            processed = apply_batch_results(db, resume_batch_id)
+            logger.info("Applied %d reception summaries from batch %s.", processed, resume_batch_id)
+            return
+
+        query = select(Anime)
+        if not reprocess_all:
+            query = query.outerjoin(ReceptionSignal, ReceptionSignal.anime_id == Anime.id).where(
+                ReceptionSignal.anime_id.is_(None)
+            )
+        rows = db.scalars(query).all()
+
+        if not rows:
+            logger.info("Nothing to summarize.")
+            return
+
+        logger.info("Fetching reviews for %d anime from Jikan (rate-limited, this is slow)...", len(rows))
+        batch_requests = []
+        no_review_ids = []
+        for row in rows:
+            reviews = collect_review_texts(row.id, max_reviews)
+            if reviews:
+                batch_requests.append(build_batch_request(row.id, row.title, reviews))
+            else:
+                no_review_ids.append(row.id)
+
+        for anime_id in no_review_ids:
+            upsert_reception(db, anime_id, summary=None, sentiment_ratio=None)
+        db.commit()
+        logger.info("%d anime had no reviews; recorded with no reception data.", len(no_review_ids))
+
+        if not batch_requests:
+            logger.info("No batch requests to submit.")
+            return
+
+        batch_id = submit_batch(batch_requests)
+        ended = poll_batch(batch_id, poll_interval, poll_timeout)
+        if not ended:
+            logger.info("Batch %s still processing. Re-run with --resume %s to finish later.", batch_id, batch_id)
+            return
+
+        processed = apply_batch_results(db, batch_id)
+        logger.info("Done. Applied %d reception summaries.", processed)
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--max-reviews", type=int, default=6)
+    parser.add_argument("--reprocess-all", action="store_true")
+    parser.add_argument("--poll-interval", type=int, default=15, help="Seconds between batch status checks")
+    parser.add_argument("--poll-timeout", type=int, default=600, help="Max seconds to wait before giving up and printing --resume instructions")
+    parser.add_argument("--resume", dest="resume_batch_id", default=None, help="Resume polling/applying an existing batch id")
+    args = parser.parse_args()
+    run(
+        max_reviews=args.max_reviews,
+        reprocess_all=args.reprocess_all,
+        poll_interval=args.poll_interval,
+        poll_timeout=args.poll_timeout,
+        resume_batch_id=args.resume_batch_id,
+    )

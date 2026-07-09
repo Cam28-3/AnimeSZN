@@ -1,0 +1,16 @@
+[
+  {"query": "psychological thriller where a genius outsmarts a serial killer using notebooks and mind games", "expected_id": 1535, "expected_title": "Death Note"},
+  {"query": "time travel science fiction thriller with a dark twist and lab equipment", "expected_id": 9253, "expected_title": "Steins;Gate"},
+  {"query": "drama about a boy seeking redemption after bullying a deaf girl in school", "expected_id": 28851, "expected_title": "Koe no Katachi"},
+  {"query": "trapped inside a game world, strategy and gambling to win everything", "expected_id": 19815, "expected_title": "No Game No Life"},
+  {"query": "mecha rebellion story about a prince overthrowing an empire using masks and super powers at school", "expected_id": 1575, "expected_title": "Code Geass: Hangyaku no Lelouch"},
+  {"query": "giant humanoid monsters attack humanity behind walls, survival and military strategy", "expected_id": 16498, "expected_title": "Shingeki no Kyojin"},
+  {"query": "two alchemist brothers go on a military fantasy adventure to restore their bodies", "expected_id": 5114, "expected_title": "Fullmetal Alchemist: Brotherhood"},
+  {"query": "comedy about an overpowered hero who defeats every enemy in one punch", "expected_id": 30276, "expected_title": "One Punch Man"},
+  {"query": "ninja martial arts shounen adventure about a young outcast becoming a hero", "expected_id": 20, "expected_title": "Naruto"},
+  {"query": "students at a school for sorcerers fighting curses", "expected_id": 40748, "expected_title": "Jujutsu Kaisen"},
+  {"query": "players trapped in a deadly virtual reality MMO video game", "expected_id": 11757, "expected_title": "Sword Art Online"},
+  {"query": "body horror gore story about flesh eating monsters in an urban fantasy city", "expected_id": 22319, "expected_title": "Tokyo Ghoul"},
+  {"query": "isekai character relives the same events over and over, psychological suspense", "expected_id": 31240, "expected_title": "Re:Zero kara Hajimeru Isekai Seikatsu"},
+  {"query": "beautifully animated award winning movie about two teenagers swapping bodies", "expected_id": 32281, "expected_title": "Kimi no Na wa."}
+]
