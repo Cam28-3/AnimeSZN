@@ -48,7 +48,9 @@ function App() {
 
   return (
     <div className="app">
-      <h1>AnimeSZN</h1>
+      <h1 className="wordmark">
+        ANIME<span className="wordmark-accent">SZN</span>
+      </h1>
       <p className="tagline">Find or discover anime — the agent checks community reception before recommending.</p>
 
       <form onSubmit={handleSubmit} className="query-form">
