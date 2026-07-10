@@ -1,6 +1,7 @@
 import time
 
 import httpx
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 BASE_URL = "https://api.jikan.moe/v4"
 REQUEST_INTERVAL_SECONDS = 1.0  # Jikan asks for ~3/sec; we stay well under that
@@ -8,6 +9,12 @@ REQUEST_INTERVAL_SECONDS = 1.0  # Jikan asks for ~3/sec; we stay well under that
 _client = httpx.Client(base_url=BASE_URL, timeout=30.0)
 
 
+@retry(
+    retry=retry_if_exception_type(httpx.TransportError),
+    wait=wait_exponential(multiplier=2, min=5, max=60),
+    stop=stop_after_attempt(6),
+    reraise=True,
+)
 def _get(path: str, params: dict | None = None) -> dict:
     response = _client.get(path, params=params)
     response.raise_for_status()
