@@ -3,6 +3,55 @@ import "./App.css";
 
 const API_BASE = "http://localhost:8000";
 
+function WhereToWatch({ animeId }) {
+  const [state, setState] = useState("idle"); // idle | loading | loaded | error
+  const [platforms, setPlatforms] = useState([]);
+
+  async function handleClick() {
+    if (state === "loading") return;
+    setState("loading");
+    try {
+      const res = await fetch(`${API_BASE}/anime/${animeId}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setPlatforms(data.streaming);
+      setState("loaded");
+    } catch {
+      setState("error");
+    }
+  }
+
+  if (state === "idle") {
+    return (
+      <button type="button" className="watch-link" onClick={handleClick}>
+        Where to watch →
+      </button>
+    );
+  }
+
+  if (state === "loading") {
+    return <p className="watch-status">Looking that up...</p>;
+  }
+
+  if (state === "error") {
+    return <p className="watch-status">Couldn't fetch streaming info.</p>;
+  }
+
+  if (platforms.length === 0) {
+    return <p className="watch-status">No streaming platforms listed.</p>;
+  }
+
+  return (
+    <div className="watch-links">
+      {platforms.map((p) => (
+        <a key={p.name} href={p.url} target="_blank" rel="noopener noreferrer" className="watch-pill">
+          {p.name}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function RecommendationCard({ rec }) {
   return (
     <div className="card">
@@ -12,6 +61,7 @@ function RecommendationCard({ rec }) {
       </div>
       <p className="rationale">{rec.rationale}</p>
       {rec.caveat && <p className="caveat">⚠ {rec.caveat}</p>}
+      <WhereToWatch animeId={rec.anime_id} />
     </div>
   );
 }

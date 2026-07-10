@@ -159,3 +159,50 @@
   padding: 10px 12px;
   margin: 0;
 }
+
+.watch-link {
+  align-self: flex-start;
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.watch-link:hover {
+  text-decoration: underline;
+}
+
+.watch-status {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.watch-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.watch-pill {
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-h);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.watch-pill:hover {
+  border-color: var(--accent);
+}

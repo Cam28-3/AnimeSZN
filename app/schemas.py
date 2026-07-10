@@ -19,6 +19,11 @@ class RecommendResponse(BaseModel):
     recommendations: list[RecommendationOut]
 
 
+class StreamingPlatformOut(BaseModel):
+    name: str
+    url: str
+
+
 class AnimeDetailOut(BaseModel):
     id: int
     title: str
@@ -32,3 +37,4 @@ class AnimeDetailOut(BaseModel):
     reception_summary: str | None
     review_sentiment_ratio: float | None
     community_flag: str | None
+    streaming: list[StreamingPlatformOut]

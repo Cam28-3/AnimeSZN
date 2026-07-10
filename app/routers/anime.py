@@ -1,10 +1,16 @@
+import logging
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.jikan_client import fetch_streaming
 from app.models.anime import Anime
 from app.models.reception import ReceptionSignal
-from app.schemas import AnimeDetailOut
+from app.schemas import AnimeDetailOut, StreamingPlatformOut
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -15,6 +21,12 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
     if anime is None:
         raise HTTPException(status_code=404, detail="Anime not found")
     reception = db.get(ReceptionSignal, anime_id)
+
+    try:
+        streaming = fetch_streaming(anime_id)
+    except httpx.HTTPError:
+        logger.warning("Jikan streaming lookup failed for anime_id %s", anime_id, exc_info=True)
+        streaming = []
 
     return AnimeDetailOut(
         id=anime.id,
@@ -33,4 +45,5 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
             else None
         ),
         community_flag=reception.community_flag.value if reception else None,
+        streaming=[StreamingPlatformOut(**s) for s in streaming],
     )
