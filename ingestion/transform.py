@@ -43,4 +43,5 @@ def transform_anime(entry: dict) -> dict:
         "score": entry.get("score"),
         "score_stddev": None,  # requires /anime/{id}/statistics; not fetched at this stage
         "popularity_rank": entry.get("popularity"),
+        "image_url": entry.get("images", {}).get("jpg", {}).get("image_url"),
     }

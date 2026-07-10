@@ -45,5 +45,6 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
             else None
         ),
         community_flag=reception.community_flag.value if reception else None,
+        image_url=anime.image_url,
         streaming=[StreamingPlatformOut(**s) for s in streaming],
     )

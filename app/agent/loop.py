@@ -39,6 +39,7 @@ class RecommendationCard:
     caveat: str | None
     score: float | None
     community_flag: str | None
+    image_url: str | None
 
 
 @dataclass
@@ -76,6 +77,7 @@ def _build_result(db: Session, respond_input: dict) -> AgentResult:
                 caveat=caveat,
                 score=float(anime.score) if anime.score is not None else None,
                 community_flag=reception.community_flag.value if reception else None,
+                image_url=anime.image_url,
             )
         )
     return AgentResult(message=respond_input.get("message", ""), recommendations=recommendations)

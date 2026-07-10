@@ -12,6 +12,7 @@ class RecommendationOut(BaseModel):
     caveat: str | None
     score: float | None
     community_flag: str | None
+    image_url: str | None
 
 
 class RecommendResponse(BaseModel):
@@ -37,4 +38,5 @@ class AnimeDetailOut(BaseModel):
     reception_summary: str | None
     review_sentiment_ratio: float | None
     community_flag: str | None
+    image_url: str | None
     streaming: list[StreamingPlatformOut]

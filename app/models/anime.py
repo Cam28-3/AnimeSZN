@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
-EMBEDDING_DIM = 1024  # voyage-3 output dimension
+EMBEDDING_DIM = 1024  # voyage-4 output dimension
 
 
 class Anime(Base):
@@ -23,4 +23,5 @@ class Anime(Base):
     score: Mapped[float | None] = mapped_column(Numeric)
     score_stddev: Mapped[float | None] = mapped_column(Numeric)
     popularity_rank: Mapped[int | None] = mapped_column()
+    image_url: Mapped[str | None] = mapped_column(String)
     synopsis_embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM))

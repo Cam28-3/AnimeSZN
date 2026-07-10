@@ -55,13 +55,20 @@ function WhereToWatch({ animeId }) {
 function RecommendationCard({ rec }) {
   return (
     <div className="card">
-      <div className="card-header">
-        <h3>{rec.title}</h3>
-        {rec.score != null && <span className="score">{rec.score.toFixed(2)}</span>}
+      {rec.image_url && (
+        <div className="card-image">
+          <img src={rec.image_url} alt="" loading="lazy" />
+        </div>
+      )}
+      <div className="card-body">
+        <div className="card-header">
+          <h3>{rec.title}</h3>
+          {rec.score != null && <span className="score">{rec.score.toFixed(2)}</span>}
+        </div>
+        <p className="rationale">{rec.rationale}</p>
+        {rec.caveat && <p className="caveat">⚠ {rec.caveat}</p>}
+        <WhereToWatch animeId={rec.anime_id} />
       </div>
-      <p className="rationale">{rec.rationale}</p>
-      {rec.caveat && <p className="caveat">⚠ {rec.caveat}</p>}
-      <WhereToWatch animeId={rec.anime_id} />
     </div>
   );
 }

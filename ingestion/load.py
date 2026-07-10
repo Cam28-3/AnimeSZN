@@ -14,6 +14,7 @@ _UPSERT_COLUMNS = [
     "score",
     "score_stddev",
     "popularity_rank",
+    "image_url",
 ]
 
 

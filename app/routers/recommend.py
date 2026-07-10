@@ -21,6 +21,7 @@ def recommend(request: RecommendRequest, db: Session = Depends(get_db)) -> Recom
                 caveat=rec.caveat,
                 score=rec.score,
                 community_flag=rec.community_flag,
+                image_url=rec.image_url,
             )
             for rec in result.recommendations
         ],
