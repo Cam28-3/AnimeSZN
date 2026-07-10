@@ -35,8 +35,12 @@ def run(batch_size: int, reembed_all: bool) -> None:
         total = 0
         for i in range(0, len(rows), batch_size):
             chunk = rows[i : i + batch_size]
-            texts = [build_embedding_text(r.synopsis, r.genres, r.tags) for r in chunk]
-            vectors = embed_documents(texts)
+            texts = [build_embedding_text(r.title, r.synopsis, r.genres, r.tags) for r in chunk]
+            try:
+                vectors = embed_documents(texts)
+            except Exception:
+                logger.exception("Failed to embed batch (ids %s) -- skipping and continuing", [r.id for r in chunk])
+                continue
             for row, vector in zip(chunk, vectors):
                 row.synopsis_embedding = vector
             db.commit()

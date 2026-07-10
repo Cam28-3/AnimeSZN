@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -5,6 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.embeddings import embed_query
 from app.models.anime import Anime
+
+# Pure cosine similarity lets obscure titles that happen to match query text literally
+# outrank far more famous, canonical matches (e.g. dozens of niche ninja anime outranking
+# Naruto). Blend in a log-scaled popularity boost so well-known titles aren't crowded out.
+POPULARITY_WEIGHT = 0.25
+POPULARITY_RANK_CEILING = 50_000  # soft normalization ceiling; doesn't need to match catalog size exactly
+CANDIDATE_POOL_MULTIPLIER = 5  # rerank within a wider pool than the final requested limit
 
 
 @dataclass
@@ -33,6 +41,13 @@ def semantic_search(db: Session, query_text: str, filters: SearchFilters | None 
     return semantic_search_by_vector(db, query_vector, filters=filters, limit=limit)
 
 
+def _popularity_boost(popularity_rank: int | None) -> float:
+    """0..1, higher for lower (better) ranks. log-scaled so it fades gently, not a cliff."""
+    if popularity_rank is None or popularity_rank < 1:
+        return 0.0
+    return max(0.0, 1 - math.log(popularity_rank) / math.log(POPULARITY_RANK_CEILING))
+
+
 def semantic_search_by_vector(
     db: Session, query_vector: list[float], filters: SearchFilters | None = None, limit: int = 10
 ) -> list[SearchResult]:
@@ -58,8 +73,17 @@ def semantic_search_by_vector(
             Anime.aired_from <= f"{filters.max_year}-12-31"
         )
 
-    stmt = stmt.order_by(distance).limit(limit)
+    # Pull a wider candidate pool by pure similarity, then rerank it with a popularity blend --
+    # keeps relevance dominant while still letting well-known titles win close calls.
+    stmt = stmt.order_by(distance).limit(limit * CANDIDATE_POOL_MULTIPLIER)
     rows = db.execute(stmt).all()
+
+    def blended_score(row) -> float:
+        _, dist = row
+        similarity = 1 - dist
+        return similarity * (1 - POPULARITY_WEIGHT) + _popularity_boost(row[0].popularity_rank) * POPULARITY_WEIGHT
+
+    rows = sorted(rows, key=blended_score, reverse=True)[:limit]
 
     return [
         SearchResult(

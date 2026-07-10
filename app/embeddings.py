@@ -1,12 +1,24 @@
 import voyageai
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import settings
 
-EMBEDDING_MODEL = "voyage-3"
+EMBEDDING_MODEL = "voyage-4"
 EMBEDDING_DIM = 1024
 MAX_BATCH_SIZE = 64  # stay well under Voyage's per-request text/token limits
 
 _client = voyageai.Client(api_key=settings.voyage_api_key)
+
+
+@retry(
+    retry=retry_if_exception_type(voyageai.error.RateLimitError),
+    wait=wait_exponential(multiplier=2, min=10, max=90),
+    stop=stop_after_attempt(8),
+    reraise=True,
+)
+def _embed(chunk: list[str], input_type: str) -> list[list[float]]:
+    result = _client.embed(chunk, model=EMBEDDING_MODEL, input_type=input_type)
+    return result.embeddings
 
 
 def embed_documents(texts: list[str]) -> list[list[float]]:
@@ -14,8 +26,7 @@ def embed_documents(texts: list[str]) -> list[list[float]]:
     embeddings: list[list[float]] = []
     for i in range(0, len(texts), MAX_BATCH_SIZE):
         chunk = texts[i : i + MAX_BATCH_SIZE]
-        result = _client.embed(chunk, model=EMBEDDING_MODEL, input_type="document")
-        embeddings.extend(result.embeddings)
+        embeddings.extend(_embed(chunk, "document"))
     return embeddings
 
 
@@ -29,15 +40,16 @@ def embed_queries(texts: list[str]) -> list[list[float]]:
     embeddings: list[list[float]] = []
     for i in range(0, len(texts), MAX_BATCH_SIZE):
         chunk = texts[i : i + MAX_BATCH_SIZE]
-        result = _client.embed(chunk, model=EMBEDDING_MODEL, input_type="query")
-        embeddings.extend(result.embeddings)
+        embeddings.extend(_embed(chunk, "query"))
     return embeddings
 
 
-def build_embedding_text(synopsis: str | None, genres: list[str], tags: list[str]) -> str:
+def build_embedding_text(title: str, synopsis: str | None, genres: list[str], tags: list[str]) -> str:
     parts = [synopsis or ""]
     if tags:
         parts.append("Themes: " + ", ".join(tags))
     if genres:
         parts.append("Genres: " + ", ".join(genres))
-    return "\n".join(p for p in parts if p)
+    text = "\n".join(p for p in parts if p)
+    # Voyage rejects empty strings; a handful of catalog entries have no synopsis/genres/tags at all.
+    return text or title

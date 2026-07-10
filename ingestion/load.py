@@ -20,6 +20,12 @@ _UPSERT_COLUMNS = [
 def upsert_anime(db: Session, rows: list[dict]) -> None:
     if not rows:
         return
+    # Jikan's popularity ordering can drift mid-crawl, occasionally yielding the same id
+    # twice in one page/batch -- ON CONFLICT DO UPDATE can't touch a row twice in one
+    # statement, so keep only the last occurrence per id.
+    deduped = {row["id"]: row for row in rows}
+    rows = list(deduped.values())
+
     stmt = insert(Anime).values(rows)
     stmt = stmt.on_conflict_do_update(
         index_elements=["id"],

@@ -23,14 +23,14 @@ def fetch_anime_page(page: int) -> tuple[list[dict], bool]:
     return entries, has_next_page
 
 
-def iter_anime(max_pages: int | None = None):
-    page = 1
+def iter_anime(max_pages: int | None = None, start_page: int = 1):
+    page = start_page
     while True:
         entries, has_next_page = fetch_anime_page(page)
         yield from entries
         if not has_next_page:
             break
-        if max_pages is not None and page >= max_pages:
+        if max_pages is not None and page - start_page + 1 >= max_pages:
             break
         page += 1
 
