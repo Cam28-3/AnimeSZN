@@ -5,6 +5,14 @@
   width: 100%;
 }
 
+.header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .wordmark {
   font-family: var(--display);
   font-size: 4.5rem;
@@ -16,6 +24,24 @@
 
 .wordmark-accent {
   color: var(--accent);
+}
+
+.reset-button {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.reset-button:hover {
+  border-color: var(--accent);
+  color: var(--text-h);
 }
 
 .tagline {
@@ -78,6 +104,23 @@
 .error {
   color: var(--danger);
   margin-bottom: 16px;
+}
+
+.turn {
+  margin-top: 40px;
+}
+
+.turn + .turn {
+  border-top: 1px solid var(--border);
+  padding-top: 40px;
+}
+
+.user-query {
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 14px;
 }
 
 .agent-message {

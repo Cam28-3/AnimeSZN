@@ -10,7 +10,8 @@ router = APIRouter()
 
 @router.post("/recommend", response_model=RecommendResponse)
 def recommend(request: RecommendRequest, db: Session = Depends(get_db)) -> RecommendResponse:
-    result = run_agent(db, request.query)
+    history = [turn.model_dump() for turn in request.history]
+    result = run_agent(db, request.query, history=history)
     return RecommendResponse(
         message=result.message,
         recommendations=[

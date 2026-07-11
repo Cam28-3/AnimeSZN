@@ -1,8 +1,20 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class HistoryRecommendationIn(BaseModel):
+    anime_id: int
+    title: str
+
+
+class HistoryTurnIn(BaseModel):
+    query: str
+    message: str
+    recommendations: list[HistoryRecommendationIn] = []
 
 
 class RecommendRequest(BaseModel):
     query: str
+    history: list[HistoryTurnIn] = Field(default_factory=list, max_length=20)
 
 
 class RecommendationOut(BaseModel):

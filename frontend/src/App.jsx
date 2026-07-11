@@ -77,7 +77,7 @@ function App() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
+  const [turns, setTurns] = useState([]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -85,17 +85,23 @@ function App() {
 
     setLoading(true);
     setError(null);
-    setResult(null);
+
+    const history = turns.map((t) => ({
+      query: t.query,
+      message: t.message,
+      recommendations: t.recommendations.map((r) => ({ anime_id: r.anime_id, title: r.title })),
+    }));
 
     try {
       const res = await fetch(`${API_BASE}/recommend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, history }),
       });
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const data = await res.json();
-      setResult(data);
+      setTurns((prev) => [...prev, { query, message: data.message, recommendations: data.recommendations }]);
+      setQuery("");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -105,9 +111,16 @@ function App() {
 
   return (
     <div className="app">
-      <h1 className="wordmark">
-        ANIME<span className="wordmark-accent">SZN</span>
-      </h1>
+      <div className="header-row">
+        <h1 className="wordmark">
+          ANIME<span className="wordmark-accent">SZN</span>
+        </h1>
+        {turns.length > 0 && (
+          <button type="button" className="reset-button" onClick={() => setTurns([])}>
+            New conversation
+          </button>
+        )}
+      </div>
       <p className="tagline">Find or discover anime — the agent checks community reception before recommending.</p>
 
       <form onSubmit={handleSubmit} className="query-form">
@@ -125,16 +138,17 @@ function App() {
 
       {error && <p className="error">{error}</p>}
 
-      {result && (
-        <div className="results">
-          <p className="agent-message">{result.message}</p>
+      {turns.map((t, i) => (
+        <div className="turn" key={i}>
+          <p className="user-query">You asked: {t.query}</p>
+          <p className="agent-message">{t.message}</p>
           <div className="card-grid">
-            {result.recommendations.map((rec) => (
+            {t.recommendations.map((rec) => (
               <RecommendationCard key={rec.anime_id} rec={rec} />
             ))}
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

@@ -9,6 +9,7 @@ from app.models.anime import Anime
 from app.models.reception import ReceptionSignal
 
 MAX_TOOL_ROUNDS = 3
+MAX_HISTORY_TURNS = 6
 
 SYSTEM_PROMPT = """You are the recommendation agent for AnimeSZN, an anime discovery app.
 
@@ -28,6 +29,14 @@ Rules:
 - You have at most {max_rounds} rounds of tool calls before you must finalize.
 - Always end by calling the `respond` tool with a short message and per-title rationale
   (and a caveat field for any title with reception concerns). Never answer in plain text.
+
+You may be continuing a multi-turn conversation -- earlier user questions and your own prior
+replies (with a short recap of what you recommended) may already appear in this message list.
+When the user refers back to your previous answer ("those", "the first one", "not that one",
+"something lighter than what you just gave me"), resolve the reference from that history rather
+than asking them to repeat it. Don't re-run search_by_title or semantic_search for a title you
+already resolved earlier in the conversation -- reuse its anime_id directly, and only call tools
+for what's actually new.
 """.format(max_rounds=MAX_TOOL_ROUNDS)
 
 
@@ -83,6 +92,19 @@ def _build_result(db: Session, respond_input: dict) -> AgentResult:
     return AgentResult(message=respond_input.get("message", ""), recommendations=recommendations)
 
 
+def _condense_history(history: list[dict]) -> list[dict]:
+    messages = []
+    for turn in history[-MAX_HISTORY_TURNS:]:
+        messages.append({"role": "user", "content": turn["query"]})
+        recap = turn["message"]
+        recs = turn.get("recommendations") or []
+        if recs:
+            titled = ", ".join(f"{r['title']} (id {r['anime_id']})" for r in recs)
+            recap = f"{recap}\n\n(Recommended: {titled})"
+        messages.append({"role": "assistant", "content": recap})
+    return messages
+
+
 def _run_tool_round(messages: list, tool_choice: dict | None = None):
     kwargs = {}
     if tool_choice is not None:
@@ -90,15 +112,16 @@ def _run_tool_round(messages: list, tool_choice: dict | None = None):
     return client.messages.create(
         model=AGENT_MODEL,
         max_tokens=1500,
-        system=SYSTEM_PROMPT,
+        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         tools=TOOL_DEFINITIONS,
         messages=messages,
         **kwargs,
     )
 
 
-def run_agent(db: Session, user_query: str) -> AgentResult:
-    messages: list = [{"role": "user", "content": user_query}]
+def run_agent(db: Session, user_query: str, history: list[dict] | None = None) -> AgentResult:
+    messages: list = _condense_history(history or [])
+    messages.append({"role": "user", "content": user_query})
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = _run_tool_round(messages)
