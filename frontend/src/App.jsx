@@ -78,6 +78,16 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [turns, setTurns] = useState([]);
+  const [expandedTurns, setExpandedTurns] = useState(new Set());
+
+  function toggleTurn(index) {
+    setExpandedTurns((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -138,17 +148,31 @@ function App() {
 
       {error && <p className="error">{error}</p>}
 
-      {turns.map((t, i) => (
-        <div className="turn" key={i}>
-          <p className="user-query">You asked: {t.query}</p>
-          <p className="agent-message">{t.message}</p>
-          <div className="card-grid">
-            {t.recommendations.map((rec) => (
-              <RecommendationCard key={rec.anime_id} rec={rec} />
-            ))}
-          </div>
-        </div>
-      ))}
+      {turns
+        .map((t, i) => ({ t, i }))
+        .reverse()
+        .map(({ t, i }) => {
+          const isLatest = i === turns.length - 1;
+          const isExpanded = isLatest || expandedTurns.has(i);
+          return (
+            <div className={`turn ${isExpanded ? "expanded" : "collapsed"}`} key={i}>
+              <button type="button" className="turn-header" onClick={() => toggleTurn(i)}>
+                <span className="user-query">You asked: {t.query}</span>
+                <span className="turn-toggle">{isExpanded ? "▲" : "▼"}</span>
+              </button>
+              {isExpanded && (
+                <>
+                  <p className="agent-message">{t.message}</p>
+                  <div className="card-grid">
+                    {t.recommendations.map((rec) => (
+                      <RecommendationCard key={rec.anime_id} rec={rec} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
     </div>
   );
 }
