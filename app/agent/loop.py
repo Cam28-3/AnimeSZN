@@ -39,6 +39,18 @@ already resolved earlier in the conversation -- reuse its anime_id directly, and
 for what's actually new.
 """.format(max_rounds=MAX_TOOL_ROUNDS)
 
+SPOILER_FREE_ADDENDUM = """
+
+Spoiler-free mode is ON for this conversation. In your `message` and each recommendation's
+`rationale`, do not reveal plot twists, character deaths or fates, major story developments, or
+endings -- describe genre, tone, premise, and appeal only, at the level of detail you'd find on
+the back of a box. If the user explicitly asks about a specific spoiler (e.g. "does X die", "what
+happens at the end", "is there a twist"), you may answer it, but you MUST put a clear warning
+immediately before the spoiler itself (e.g. "⚠️ Spoiler:") so it's obvious where safe content ends
+and spoiler content begins -- never blend a spoiler into a sentence without that warning."""
+
+SYSTEM_PROMPT_SPOILER_FREE = SYSTEM_PROMPT + SPOILER_FREE_ADDENDUM
+
 
 @dataclass
 class RecommendationCard:
@@ -105,26 +117,29 @@ def _condense_history(history: list[dict]) -> list[dict]:
     return messages
 
 
-def _run_tool_round(messages: list, tool_choice: dict | None = None):
+def _run_tool_round(messages: list, spoiler_free: bool, tool_choice: dict | None = None):
     kwargs = {}
     if tool_choice is not None:
         kwargs["tool_choice"] = tool_choice
+    system_prompt = SYSTEM_PROMPT_SPOILER_FREE if spoiler_free else SYSTEM_PROMPT
     return client.messages.create(
         model=AGENT_MODEL,
         max_tokens=1500,
-        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+        system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
         tools=TOOL_DEFINITIONS,
         messages=messages,
         **kwargs,
     )
 
 
-def run_agent(db: Session, user_query: str, history: list[dict] | None = None) -> AgentResult:
+def run_agent(
+    db: Session, user_query: str, history: list[dict] | None = None, spoiler_free: bool = False
+) -> AgentResult:
     messages: list = _condense_history(history or [])
     messages.append({"role": "user", "content": user_query})
 
     for _ in range(MAX_TOOL_ROUNDS):
-        response = _run_tool_round(messages)
+        response = _run_tool_round(messages, spoiler_free)
         messages.append({"role": "assistant", "content": response.content})
 
         if response.stop_reason != "tool_use":
@@ -157,6 +172,6 @@ def run_agent(db: Session, user_query: str, history: list[dict] | None = None) -
             ),
         }
     )
-    response = _run_tool_round(messages, tool_choice={"type": "tool", "name": "respond"})
+    response = _run_tool_round(messages, spoiler_free, tool_choice={"type": "tool", "name": "respond"})
     respond_block = next(b for b in response.content if b.type == "tool_use" and b.name == "respond")
     return _build_result(db, respond_block.input)

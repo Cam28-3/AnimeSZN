@@ -99,6 +99,7 @@ function App() {
   const [turns, setTurns] = useState([]);
   const [expandedTurns, setExpandedTurns] = useState(new Set());
   const [discoverItems, setDiscoverItems] = useState([]);
+  const [spoilerFree, setSpoilerFree] = useState(true);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -139,7 +140,7 @@ function App() {
       const res = await fetch(`${API_BASE}/recommend`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, history }),
+        body: JSON.stringify({ query, history, spoiler_free: spoilerFree }),
       });
       if (!res.ok) throw new Error(`Request failed (${res.status})`);
       const data = await res.json();
@@ -179,6 +180,18 @@ function App() {
           {loading ? "Thinking..." : "Ask"}
         </button>
       </form>
+
+      <label className="spoiler-toggle">
+        <input
+          type="checkbox"
+          checked={spoilerFree}
+          onChange={(e) => setSpoilerFree(e.target.checked)}
+        />
+        <span className="spoiler-toggle-track">
+          <span className="spoiler-toggle-thumb" />
+        </span>
+        <span>Spoiler-free mode</span>
+      </label>
 
       {error && <p className="error">{error}</p>}
 

@@ -15,6 +15,7 @@ class HistoryTurnIn(BaseModel):
 class RecommendRequest(BaseModel):
     query: str
     history: list[HistoryTurnIn] = Field(default_factory=list, max_length=20)
+    spoiler_free: bool = True
 
 
 class RecommendationOut(BaseModel):
