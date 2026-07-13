@@ -73,6 +73,27 @@ function RecommendationCard({ rec }) {
   );
 }
 
+function SpotlightCard({ rec }) {
+  return (
+    <div className="card spotlight-card">
+      {rec.image_url && (
+        <div className="card-image">
+          <img src={rec.image_url} alt="" loading="lazy" />
+        </div>
+      )}
+      <div className="card-body">
+        <div className="card-header">
+          <h3>{rec.title}</h3>
+          {rec.score != null && <span className="score">{rec.score.toFixed(2)}</span>}
+        </div>
+        <p className="rationale">{rec.rationale}</p>
+        {rec.caveat && <p className="caveat">⚠ {rec.caveat}</p>}
+        <WhereToWatch animeId={rec.anime_id} />
+      </div>
+    </div>
+  );
+}
+
 function DiscoverCard({ item, onPick }) {
   return (
     <button type="button" className="card discover-card" onClick={() => onPick(item.title)}>
@@ -221,11 +242,15 @@ function App() {
               {isExpanded && (
                 <>
                   <p className="agent-message">{t.message}</p>
-                  <div className="card-grid">
-                    {t.recommendations.map((rec) => (
-                      <RecommendationCard key={rec.anime_id} rec={rec} />
-                    ))}
-                  </div>
+                  {t.recommendations.length === 1 ? (
+                    <SpotlightCard rec={t.recommendations[0]} />
+                  ) : (
+                    <div className="card-grid">
+                      {t.recommendations.map((rec) => (
+                        <RecommendationCard key={rec.anime_id} rec={rec} />
+                      ))}
+                    </div>
+                  )}
                 </>
               )}
             </div>

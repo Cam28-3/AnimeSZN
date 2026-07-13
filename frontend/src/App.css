@@ -321,6 +321,43 @@
   gap: 10px;
 }
 
+.spotlight-card {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.spotlight-card .card-image {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.spotlight-card .card-body {
+  flex: 1;
+  padding: 28px 32px;
+  gap: 16px;
+  justify-content: center;
+}
+
+.spotlight-card .card-header h3 {
+  font-size: 1.4rem;
+}
+
+.spotlight-card .rationale {
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: 60ch;
+}
+
+@media (max-width: 640px) {
+  .spotlight-card {
+    flex-direction: column;
+  }
+
+  .spotlight-card .card-image {
+    width: 100%;
+  }
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
