@@ -32,6 +32,14 @@ class RecommendResponse(BaseModel):
     recommendations: list[RecommendationOut]
 
 
+class DiscoverItemOut(BaseModel):
+    anime_id: int
+    title: str
+    score: float | None
+    image_url: str | None
+    genres: list[str]
+
+
 class StreamingPlatformOut(BaseModel):
     name: str
     url: str

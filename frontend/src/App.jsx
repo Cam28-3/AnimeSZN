@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 
 const API_BASE = "http://localhost:8000";
@@ -73,12 +73,40 @@ function RecommendationCard({ rec }) {
   );
 }
 
+function DiscoverCard({ item, onPick }) {
+  return (
+    <button type="button" className="card discover-card" onClick={() => onPick(item.title)}>
+      {item.image_url && (
+        <div className="card-image">
+          <img src={item.image_url} alt="" loading="lazy" />
+        </div>
+      )}
+      <div className="card-body">
+        <div className="card-header">
+          <h3>{item.title}</h3>
+          {item.score != null && <span className="score">{item.score.toFixed(2)}</span>}
+        </div>
+        {item.genres.length > 0 && <p className="genre-tags">{item.genres.join(" · ")}</p>}
+      </div>
+    </button>
+  );
+}
+
 function App() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [turns, setTurns] = useState([]);
   const [expandedTurns, setExpandedTurns] = useState(new Set());
+  const [discoverItems, setDiscoverItems] = useState([]);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/discover`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setDiscoverItems)
+      .catch(() => setDiscoverItems([]));
+  }, []);
 
   function toggleTurn(index) {
     setExpandedTurns((prev) => {
@@ -87,6 +115,11 @@ function App() {
       else next.add(index);
       return next;
     });
+  }
+
+  function pickDiscoverItem(title) {
+    setQuery(`something like ${title}`);
+    inputRef.current?.focus();
   }
 
   async function handleSubmit(e) {
@@ -135,6 +168,7 @@ function App() {
 
       <form onSubmit={handleSubmit} className="query-form">
         <input
+          ref={inputRef}
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -147,6 +181,17 @@ function App() {
       </form>
 
       {error && <p className="error">{error}</p>}
+
+      {turns.length === 0 && discoverItems.length > 0 && (
+        <div className="discover-section">
+          <h2 className="discover-heading">Airing now</h2>
+          <div className="card-grid">
+            {discoverItems.map((item) => (
+              <DiscoverCard key={item.anime_id} item={item} onPick={pickDiscoverItem} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {turns
         .map((t, i) => ({ t, i }))
