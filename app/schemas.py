@@ -61,3 +61,4 @@ class AnimeDetailOut(BaseModel):
     community_flag: str | None
     image_url: str | None
     streaming: list[StreamingPlatformOut]
+    streaming_unavailable: bool = False

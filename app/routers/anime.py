@@ -22,11 +22,13 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
         raise HTTPException(status_code=404, detail="Anime not found")
     reception = db.get(ReceptionSignal, anime_id)
 
+    streaming_unavailable = False
     try:
         streaming = fetch_streaming(anime_id)
     except httpx.HTTPError:
         logger.warning("Jikan streaming lookup failed for anime_id %s", anime_id, exc_info=True)
         streaming = []
+        streaming_unavailable = True
 
     return AnimeDetailOut(
         id=anime.id,
@@ -47,4 +49,5 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
         community_flag=reception.community_flag.value if reception else None,
         image_url=anime.image_url,
         streaming=[StreamingPlatformOut(**s) for s in streaming],
+        streaming_unavailable=streaming_unavailable,
     )

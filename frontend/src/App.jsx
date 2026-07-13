@@ -4,7 +4,7 @@ import "./App.css";
 const API_BASE = "http://localhost:8000";
 
 function WhereToWatch({ animeId }) {
-  const [state, setState] = useState("idle"); // idle | loading | loaded | error
+  const [state, setState] = useState("idle"); // idle | loading | loaded | error | unavailable
   const [platforms, setPlatforms] = useState([]);
 
   async function handleClick() {
@@ -14,6 +14,10 @@ function WhereToWatch({ animeId }) {
       const res = await fetch(`${API_BASE}/anime/${animeId}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
+      if (data.streaming_unavailable) {
+        setState("unavailable");
+        return;
+      }
       setPlatforms(data.streaming);
       setState("loaded");
     } catch {
@@ -35,6 +39,17 @@ function WhereToWatch({ animeId }) {
 
   if (state === "error") {
     return <p className="watch-status">Couldn't fetch streaming info.</p>;
+  }
+
+  if (state === "unavailable") {
+    return (
+      <p className="watch-status">
+        Streaming source is temporarily down —{" "}
+        <button type="button" className="watch-link" onClick={handleClick}>
+          try again
+        </button>
+      </p>
+    );
   }
 
   if (platforms.length === 0) {
