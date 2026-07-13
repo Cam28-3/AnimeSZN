@@ -111,20 +111,21 @@ function SpotlightCard({ rec }) {
 
 function DiscoverCard({ item, onPick }) {
   return (
-    <button type="button" className="card discover-card" onClick={() => onPick(item.title)}>
+    <div className="card discover-card">
       {item.image_url && (
-        <div className="card-image">
+        <div className="card-image" onClick={() => onPick(item.title)}>
           <img src={item.image_url} alt="" loading="lazy" />
         </div>
       )}
       <div className="card-body">
-        <div className="card-header">
+        <div className="card-header" onClick={() => onPick(item.title)}>
           <h3>{item.title}</h3>
           {item.score != null && <span className="score">{item.score.toFixed(2)}</span>}
         </div>
         {item.genres.length > 0 && <p className="genre-tags">{item.genres.join(" · ")}</p>}
+        <WhereToWatch animeId={item.anime_id} />
       </div>
-    </button>
+    </div>
   );
 }
 

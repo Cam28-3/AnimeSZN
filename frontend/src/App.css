@@ -175,16 +175,17 @@
 }
 
 .discover-card {
-  cursor: pointer;
   text-align: left;
-  font: inherit;
-  color: inherit;
-  padding: 0;
   width: 100%;
 }
 
 .discover-card:hover {
   border-color: var(--accent);
+}
+
+.discover-card .card-image,
+.discover-card .card-header {
+  cursor: pointer;
 }
 
 .genre-tags {
