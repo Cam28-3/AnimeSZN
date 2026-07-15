@@ -13,7 +13,7 @@ class HistoryTurnIn(BaseModel):
 
 
 class RecommendRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=500)
     history: list[HistoryTurnIn] = Field(default_factory=list, max_length=20)
     spoiler_free: bool = True
 

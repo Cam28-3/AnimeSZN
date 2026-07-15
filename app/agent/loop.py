@@ -79,6 +79,10 @@ def _fallback_caveat(reception: ReceptionSignal) -> str:
 def _build_result(db: Session, respond_input: dict) -> AgentResult:
     recommendations = []
     for rec in respond_input.get("recommendations", []):
+        if not isinstance(rec, dict):
+            # The model's tool-use input isn't strictly schema-enforced -- an occasional
+            # malformed entry shouldn't crash the whole response with a raw 500.
+            continue
         anime = db.get(Anime, rec.get("anime_id"))
         if anime is None:
             continue

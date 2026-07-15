@@ -1,17 +1,19 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.agent.loop import run_agent
 from app.db import get_db
+from app.rate_limit import limiter
 from app.schemas import RecommendationOut, RecommendRequest, RecommendResponse
 
 router = APIRouter()
 
 
 @router.post("/recommend", response_model=RecommendResponse)
-def recommend(request: RecommendRequest, db: Session = Depends(get_db)) -> RecommendResponse:
-    history = [turn.model_dump() for turn in request.history]
-    result = run_agent(db, request.query, history=history, spoiler_free=request.spoiler_free)
+@limiter.limit("10/minute")
+def recommend(request: Request, body: RecommendRequest, db: Session = Depends(get_db)) -> RecommendResponse:
+    history = [turn.model_dump() for turn in body.history]
+    result = run_agent(db, body.query, history=history, spoiler_free=body.spoiler_free)
     return RecommendResponse(
         message=result.message,
         recommendations=[
