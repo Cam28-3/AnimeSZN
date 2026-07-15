@@ -50,4 +50,5 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
         image_url=anime.image_url,
         streaming=[StreamingPlatformOut(**s) for s in streaming],
         streaming_unavailable=streaming_unavailable,
+        mal_url=f"https://myanimelist.net/anime/{anime.id}",
     )

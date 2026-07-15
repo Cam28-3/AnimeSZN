@@ -448,3 +448,9 @@
 .watch-pill:hover {
   border-color: var(--accent);
 }
+
+.watch-pill-mal {
+  background: none;
+  border-style: dashed;
+  color: var(--text-dim);
+}

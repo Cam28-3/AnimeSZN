@@ -62,3 +62,4 @@ class AnimeDetailOut(BaseModel):
     image_url: str | None
     streaming: list[StreamingPlatformOut]
     streaming_unavailable: bool = False
+    mal_url: str

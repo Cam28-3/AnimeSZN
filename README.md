@@ -25,7 +25,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env: set DATABASE_URL to your local Postgres user/db, add ANTHROPIC_API_KEY and VOYAGE_API_KEY
+
 
 createdb anime_szn
 psql -d anime_szn -c "CREATE EXTENSION vector;"
