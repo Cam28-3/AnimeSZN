@@ -71,7 +71,7 @@ python -m ingestion.ingest --max-pages 5    # limited run for testing (25 entrie
 python -m ingestion.embed
 
 # 3. Validate retrieval quality before trusting the agent's tool results
-python -m tests.eval.run_eval
+python -m eval.run_eval
 
 # 4. Review summarization: Jikan reviews -> Claude Haiku (Batch API) -> reception_signals
 python -m ingestion.summarize_reception
@@ -125,7 +125,7 @@ ingestion/                  # offline batch pipeline (fetch -> transform -> load
 └── summarize_reception.py      # Claude Haiku batch review summarization (CLI)
 
 migrations/                 # Alembic schema migrations
-tests/eval/                 # retrieval-quality eval set + runner (validates semantic_search before trusting the agent)
+eval/                        # retrieval-quality eval set + runner (validates semantic_search before trusting the agent)
 frontend/                   # React (Vite)
 └── src/
     ├── App.jsx               # query box, chat thread, discovery grid, spotlight/grid cards, spoiler toggle
