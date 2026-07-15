@@ -3,10 +3,10 @@ import "./App.css";
 
 const API_BASE = "http://localhost:8000";
 
-function MalPill({ url }) {
+function AniListPill({ url }) {
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="watch-pill watch-pill-mal">
-      MyAnimeList ↗
+    <a href={url} target="_blank" rel="noopener noreferrer" className="watch-pill watch-pill-anilist">
+      AniList ↗
     </a>
   );
 }
@@ -14,7 +14,7 @@ function MalPill({ url }) {
 function WhereToWatch({ animeId }) {
   const [state, setState] = useState("idle"); // idle | loading | loaded | error | unavailable
   const [platforms, setPlatforms] = useState([]);
-  const [malUrl, setMalUrl] = useState(null);
+  const [anilistUrl, setAnilistUrl] = useState(null);
 
   async function handleClick() {
     if (state === "loading") return;
@@ -23,7 +23,7 @@ function WhereToWatch({ animeId }) {
       const res = await fetch(`${API_BASE}/anime/${animeId}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setMalUrl(data.mal_url);
+      setAnilistUrl(data.anilist_url);
       if (data.streaming_unavailable) {
         setState("unavailable");
         return;
@@ -60,9 +60,9 @@ function WhereToWatch({ animeId }) {
             try again
           </button>
         </p>
-        {malUrl && (
+        {anilistUrl && (
           <div className="watch-links">
-            <MalPill url={malUrl} />
+            <AniListPill url={anilistUrl} />
           </div>
         )}
       </div>
@@ -76,7 +76,7 @@ function WhereToWatch({ animeId }) {
           {p.name}
         </a>
       ))}
-      {malUrl && <MalPill url={malUrl} />}
+      {anilistUrl && <AniListPill url={anilistUrl} />}
     </div>
   );
 }

@@ -4,7 +4,7 @@ Run: python -m tests.eval.run_eval [--k 3]
 
 Checks whether the expected anime appears in the top-k results for each hand-written query.
 This eval set is small and scoped to the ~25 titles currently ingested — re-expand it once
-the full Jikan catalog is loaded.
+the full AniList catalog is loaded.
 """
 
 import argparse

@@ -4,8 +4,8 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.anilist_client import fetch_streaming
 from app.db import get_db
-from app.jikan_client import fetch_streaming
 from app.models.anime import Anime
 from app.models.reception import ReceptionSignal
 from app.schemas import AnimeDetailOut, StreamingPlatformOut
@@ -26,7 +26,7 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
     try:
         streaming = fetch_streaming(anime_id)
     except httpx.HTTPError:
-        logger.warning("Jikan streaming lookup failed for anime_id %s", anime_id, exc_info=True)
+        logger.warning("AniList streaming lookup failed for anime_id %s", anime_id, exc_info=True)
         streaming = []
         streaming_unavailable = True
 
@@ -50,5 +50,5 @@ def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
         image_url=anime.image_url,
         streaming=[StreamingPlatformOut(**s) for s in streaming],
         streaming_unavailable=streaming_unavailable,
-        mal_url=f"https://myanimelist.net/anime/{anime.id}",
+        anilist_url=f"https://anilist.co/anime/{anime.id}",
     )

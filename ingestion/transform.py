@@ -1,14 +1,19 @@
 import re
-from datetime import date, datetime
+from datetime import date
 
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WHITESPACE_RE = re.compile(r"\s+")
 
 _STATUS_MAP = {
-    "Currently Airing": "airing",
-    "Finished Airing": "finished",
-    "Not yet aired": "upcoming",
+    "RELEASING": "airing",
+    "FINISHED": "finished",
+    "NOT_YET_RELEASED": "upcoming",
+    "HIATUS": "airing",  # ongoing series between seasons/arcs, closest existing status
+    "CANCELLED": "finished",  # ended, just not by completion
 }
+
+MAX_TAGS = 10
+MIN_TAG_RANK = 40  # AniList tag relevance is 0-100; drop low-confidence tags as noise
 
 
 def clean_text(text: str | None) -> str | None:
@@ -19,29 +24,38 @@ def clean_text(text: str | None) -> str | None:
     return text or None
 
 
-def parse_aired_from(aired: dict | None) -> date | None:
-    if not aired or not aired.get("from"):
+def parse_fuzzy_date(fuzzy: dict | None) -> date | None:
+    if not fuzzy or not fuzzy.get("year"):
         return None
-    return datetime.fromisoformat(aired["from"]).date()
+    return date(fuzzy["year"], fuzzy.get("month") or 1, fuzzy.get("day") or 1)
+
+
+def select_tags(raw_tags: list[dict]) -> list[str]:
+    # Never surface spoiler tags -- they'd leak plot details into the semantic-search embedding
+    # text and undermine spoiler-free mode. Cap to the highest-relevance tags so a title with 30+
+    # AniList tags doesn't drown the embedding text in low-signal noise.
+    candidates = [t for t in raw_tags if not t.get("isMediaSpoiler") and not t.get("isGeneralSpoiler")]
+    candidates.sort(key=lambda t: t.get("rank") or 0, reverse=True)
+    return [t["name"] for t in candidates if (t.get("rank") or 0) >= MIN_TAG_RANK][:MAX_TAGS]
 
 
 def transform_anime(entry: dict) -> dict:
-    genres = [g["name"] for g in entry.get("genres", [])]
-    tags = [t["name"] for t in entry.get("themes", [])] + [
-        d["name"] for d in entry.get("demographics", [])
-    ]
+    title = entry.get("title") or {}
+    display_title = title.get("english") or title.get("romaji") or f"Untitled ({entry['id']})"
+
+    score = entry.get("averageScore")
 
     return {
-        "id": entry["mal_id"],
-        "title": entry["title"],
-        "synopsis": clean_text(entry.get("synopsis")),
-        "genres": genres,
-        "tags": tags,
+        "id": entry["id"],
+        "title": display_title,
+        "synopsis": clean_text(entry.get("description")),
+        "genres": entry.get("genres") or [],
+        "tags": select_tags(entry.get("tags") or []),
         "episodes": entry.get("episodes"),
         "status": _STATUS_MAP.get(entry.get("status"), None),
-        "aired_from": parse_aired_from(entry.get("aired")),
-        "score": entry.get("score"),
-        "score_stddev": None,  # requires /anime/{id}/statistics; not fetched at this stage
-        "popularity_rank": entry.get("popularity"),
-        "image_url": entry.get("images", {}).get("jpg", {}).get("image_url"),
+        "aired_from": parse_fuzzy_date(entry.get("startDate")),
+        "score": (score / 10.0) if score is not None else None,
+        "score_stddev": None,  # not exposed by AniList's Media type
+        "popularity_rank": entry.get("popularity"),  # raw favorite/list count; ranked in a later pass
+        "image_url": (entry.get("coverImage") or {}).get("large"),
     }

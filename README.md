@@ -6,9 +6,9 @@ community reception before recommending a title — rather than surfacing anythi
 passable raw score. Full design doc: `Anime RAG Agent/Architecture.md` (Obsidian).
 
 **Status:** full pipeline working end-to-end (ingestion → embeddings → review summarization →
-agent → API → frontend). Full Jikan catalog ingested: ~30,200 titles, all with embeddings and
-poster images. Review summarization (reception data) is still only populated for the original
-~25-title seed set — see [Known gaps](#known-gaps--next-steps).
+agent → API → frontend). Data source recently migrated from Jikan (the unofficial MyAnimeList
+API, shutting down October 2026) to AniList's GraphQL API — see [Known gaps](#known-gaps--next-steps)
+for what still needs a full-scale re-run against the new source.
 
 ## Requirements
 
@@ -63,9 +63,9 @@ npm run dev   # http://localhost:5173
 All idempotent — safe to re-run; each only processes rows missing that stage's output.
 
 ```bash
-# 1. Metadata: fetch from Jikan, transform, upsert
-python -m ingestion.ingest                  # full catalog (rate-limited, ~1 req/sec, slow)
-python -m ingestion.ingest --max-pages 5    # limited run for testing (25 entries/page)
+# 1. Metadata: fetch from AniList (GraphQL, year-sliced crawl), transform, upsert
+python -m ingestion.ingest                     # full catalog (rate-limited, ~30 req/min, slow)
+python -m ingestion.ingest --start-year 2020    # resume/limit to a later starting year
 
 # 2. Embeddings: Voyage AI, synopsis + genres/tags -> pgvector column
 python -m ingestion.embed
@@ -73,7 +73,7 @@ python -m ingestion.embed
 # 3. Validate retrieval quality before trusting the agent's tool results
 python -m eval.run_eval
 
-# 4. Review summarization: Jikan reviews -> Claude Haiku (Batch API) -> reception_signals
+# 4. Review summarization: AniList reviews -> Claude Haiku (Batch API) -> reception_signals
 python -m ingestion.summarize_reception
 # if it times out waiting on the batch, resume later:
 python -m ingestion.summarize_reception --resume <batch_id>
@@ -104,7 +104,7 @@ app/                        # FastAPI live app
 ├── search.py                 # semantic_search + popularity-aware reranking
 ├── embeddings.py             # Voyage AI client (shared by app + ingestion)
 ├── llm.py                    # Anthropic client + model ids (shared by app + ingestion)
-├── jikan_client.py           # live, on-demand Jikan calls (streaming lookup) -- retried, no rate-limit pacing
+├── anilist_client.py          # live, on-demand AniList calls (streaming lookup) -- retried, no rate-limit pacing
 ├── models/
 │   ├── anime.py               # `anime` table (metadata + pgvector embedding column)
 │   └── reception.py           # `reception_signals` table
@@ -117,8 +117,8 @@ app/                        # FastAPI live app
     └── discover.py               # GET /discover (homepage "airing now")
 
 ingestion/                  # offline batch pipeline (fetch -> transform -> load -> embed -> summarize)
-├── jikan_client.py          # rate-limited bulk Jikan client (retried), separate from app/jikan_client.py
-├── transform.py              # Jikan response -> DB row
+├── anilist_client.py         # rate-limited bulk AniList client (retried, year-sliced crawl), separate from app/anilist_client.py
+├── transform.py              # AniList response -> DB row
 ├── load.py                   # idempotent upsert
 ├── ingest.py                  # full/partial catalog crawl (CLI)
 ├── embed.py                   # Voyage embedding backfill (CLI)
@@ -135,16 +135,20 @@ frontend/                   # React (Vite)
 
 ## Known gaps / next steps
 
+- **Full-catalog ingest needs a fresh run against AniList.** The previous ~30,200-title catalog
+  was Jikan-sourced and is stale/being replaced now that the pipeline points at AniList instead
+  (Jikan is shutting down October 2026). `ingestion/ingest.py` needs a full unattended run
+  (year-sliced crawl, ~30 req/min) before the catalog is back to full breadth.
 - **No scheduled catalog refresh.** Ingestion/embeddings/reception are only ever run manually —
   there's no cron/launchd job or RQ/Redis schedule re-running them (e.g. weekly/monthly, as the
   original architecture doc intended). The catalog is a static snapshot from whenever someone
   last ran `ingestion/ingest.py` by hand; new releases, score changes, and status transitions
   (e.g. airing → finished) won't show up until it's manually re-run.
-- Review summarization (`ingestion/summarize_reception.py`) has only been run for the original
-  ~25-title seed set, not the full ~30K catalog (~$25 est. cost, ~8hr wall-clock — see git log
-  for the cost breakdown). Until it's run at full scale, `check_reception` has no real data for
-  most titles, so the agent's reception commentary on those is unverified model knowledge, not
-  the sourced signal the whole project is built around.
+- Review summarization (`ingestion/summarize_reception.py`) needs a full-scale re-run against
+  AniList reviews once the catalog is re-ingested (~$25 est. cost, ~8-12hr wall-clock, same
+  order of magnitude as the original Jikan-based run). Until it's run at full scale,
+  `check_reception` has no real data for most titles, so the agent's reception commentary on
+  those is unverified model knowledge, not the sourced signal the whole project is built around.
 - RQ/Redis job queue not wired up — batch scripts run directly via CLI (same root cause as the
   scheduling gap above)
 - `search_by_title` uses plain `ILIKE`, not proper fuzzy matching (e.g. pg_trgm)
