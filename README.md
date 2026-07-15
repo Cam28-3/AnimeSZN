@@ -93,14 +93,44 @@ stored reception summary so a divisive title is never surfaced silently.
 - `POST /recommend` — `{"query": "..."}` → agent message + structured recommendation cards
 - `GET /anime/{id}` — full metadata + reception summary for a single title
 
-## Project layout
+## Project structure
 
 ```
-app/            # FastAPI live app: models, config, db session, search, embeddings, llm client, agent, routers
-ingestion/      # offline batch pipeline: fetch -> transform -> load -> embed -> summarize (Jikan + Voyage + Haiku)
-migrations/     # Alembic schema migrations
-tests/eval/     # retrieval-quality eval set + runner
-frontend/       # React (Vite) — query box + recommendation cards
+app/                        # FastAPI live app
+├── main.py                 # app instance, CORS, router registration
+├── config.py                # env-driven settings (pydantic-settings)
+├── db.py                    # SQLAlchemy engine/session
+├── schemas.py                # Pydantic request/response models
+├── search.py                 # semantic_search + popularity-aware reranking
+├── embeddings.py             # Voyage AI client (shared by app + ingestion)
+├── llm.py                    # Anthropic client + model ids (shared by app + ingestion)
+├── jikan_client.py           # live, on-demand Jikan calls (streaming lookup) -- retried, no rate-limit pacing
+├── models/
+│   ├── anime.py               # `anime` table (metadata + pgvector embedding column)
+│   └── reception.py           # `reception_signals` table
+├── agent/
+│   ├── loop.py                # tool-use loop, system prompt(s), multi-turn history, spoiler mode
+│   └── tools.py               # tool definitions + executors (search_by_title, semantic_search, find_similar, check_reception, respond)
+└── routers/
+    ├── recommend.py            # POST /recommend
+    ├── anime.py                 # GET /anime/{id}
+    └── discover.py               # GET /discover (homepage "airing now")
+
+ingestion/                  # offline batch pipeline (fetch -> transform -> load -> embed -> summarize)
+├── jikan_client.py          # rate-limited bulk Jikan client (retried), separate from app/jikan_client.py
+├── transform.py              # Jikan response -> DB row
+├── load.py                   # idempotent upsert
+├── ingest.py                  # full/partial catalog crawl (CLI)
+├── embed.py                   # Voyage embedding backfill (CLI)
+└── summarize_reception.py      # Claude Haiku batch review summarization (CLI)
+
+migrations/                 # Alembic schema migrations
+tests/eval/                 # retrieval-quality eval set + runner (validates semantic_search before trusting the agent)
+frontend/                   # React (Vite)
+└── src/
+    ├── App.jsx               # query box, chat thread, discovery grid, spotlight/grid cards, spoiler toggle
+    ├── App.css                # dark theme, animations, all component styling
+    └── index.css               # fonts, CSS variables, base reset
 ```
 
 ## Known gaps / next steps
