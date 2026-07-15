@@ -3,7 +3,7 @@
 Run: python -m ingestion.summarize_reception [--max-reviews N] [--reprocess-all]
      python -m ingestion.summarize_reception --resume <batch_id>
 
-Fetches sampled reviews from Jikan, sends them to Claude Haiku via the Message Batches API
+Fetches sampled reviews from AniList, sends them to Claude Haiku via the Message Batches API
 to produce a short reception summary + sentiment ratio, and upserts into reception_signals.
 Idempotent — only processes anime missing a reception_signals row unless --reprocess-all.
 
@@ -22,7 +22,7 @@ from app.db import SessionLocal
 from app.llm import SUMMARIZATION_MODEL, client
 from app.models.anime import Anime
 from app.models.reception import CommunityFlag, ReceptionSignal
-from ingestion.jikan_client import fetch_reviews
+from ingestion.anilist_client import fetch_reviews
 from ingestion.transform import clean_text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -132,6 +132,29 @@ def apply_batch_results(db, batch_id: str) -> int:
     return processed
 
 
+def fetch_all_reviews(rows: list[Anime], max_reviews: int) -> tuple[list[dict], list[int]]:
+    """Returns (batch_requests, no_review_ids). Titles that fail permanently (retries
+    exhausted) are logged and skipped rather than aborting the whole run -- they have no
+    reception_signals row written, so the idempotent query above picks them back up next time."""
+    batch_requests = []
+    no_review_ids = []
+    skipped_count = 0
+    for i, row in enumerate(rows, start=1):
+        try:
+            reviews = collect_review_texts(row.id, max_reviews)
+        except Exception:
+            logger.exception("Giving up on anime %s after retries -- skipping", row.id)
+            skipped_count += 1
+            continue
+        if reviews:
+            batch_requests.append(build_batch_request(row.id, row.title, reviews))
+        else:
+            no_review_ids.append(row.id)
+        if i % 250 == 0:
+            logger.info("Progress: %d/%d anime processed (%d skipped so far)", i, len(rows), skipped_count)
+    return batch_requests, no_review_ids
+
+
 def run(max_reviews: int, reprocess_all: bool, poll_interval: int, poll_timeout: int, resume_batch_id: str | None) -> None:
     db = SessionLocal()
     try:
@@ -155,15 +178,8 @@ def run(max_reviews: int, reprocess_all: bool, poll_interval: int, poll_timeout:
             logger.info("Nothing to summarize.")
             return
 
-        logger.info("Fetching reviews for %d anime from Jikan (rate-limited, this is slow)...", len(rows))
-        batch_requests = []
-        no_review_ids = []
-        for row in rows:
-            reviews = collect_review_texts(row.id, max_reviews)
-            if reviews:
-                batch_requests.append(build_batch_request(row.id, row.title, reviews))
-            else:
-                no_review_ids.append(row.id)
+        logger.info("Fetching reviews for %d anime from AniList (rate-limited, this is slow)...", len(rows))
+        batch_requests, no_review_ids = fetch_all_reviews(rows, max_reviews)
 
         for anime_id in no_review_ids:
             upsert_reception(db, anime_id, summary=None, sentiment_ratio=None)

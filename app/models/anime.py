@@ -12,7 +12,7 @@ EMBEDDING_DIM = 1024  # voyage-4 output dimension
 class Anime(Base):
     __tablename__ = "anime"
 
-    id: Mapped[int] = mapped_column(primary_key=True)  # Jikan/MAL id
+    id: Mapped[int] = mapped_column(primary_key=True)  # AniList id
     title: Mapped[str] = mapped_column(String, nullable=False)
     synopsis: Mapped[str | None] = mapped_column(Text)
     genres: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
