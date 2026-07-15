@@ -6,8 +6,9 @@ community reception before recommending a title — rather than surfacing anythi
 passable raw score. Full design doc: `Anime RAG Agent/Architecture.md` (Obsidian).
 
 **Status:** full pipeline working end-to-end (ingestion → embeddings → review summarization →
-agent → API → frontend) against a small ~25-title test catalog. The full Jikan catalog pull
-hasn't been run yet — see [Ingestion](#ingestion).
+agent → API → frontend). Full Jikan catalog ingested: ~30,200 titles, all with embeddings and
+poster images. Review summarization (reception data) is still only populated for the original
+~25-title seed set — see [Known gaps](#known-gaps--next-steps).
 
 ## Requirements
 
@@ -104,8 +105,17 @@ frontend/       # React (Vite) — query box + recommendation cards
 
 ## Known gaps / next steps
 
-- Full Jikan catalog hasn't been ingested yet (currently ~25 titles); eval set and agent
-  behavior should be re-validated at full scale
-- RQ/Redis job queue not wired up — batch scripts run directly via CLI
+- **No scheduled catalog refresh.** Ingestion/embeddings/reception are only ever run manually —
+  there's no cron/launchd job or RQ/Redis schedule re-running them (e.g. weekly/monthly, as the
+  original architecture doc intended). The catalog is a static snapshot from whenever someone
+  last ran `ingestion/ingest.py` by hand; new releases, score changes, and status transitions
+  (e.g. airing → finished) won't show up until it's manually re-run.
+- Review summarization (`ingestion/summarize_reception.py`) has only been run for the original
+  ~25-title seed set, not the full ~30K catalog (~$25 est. cost, ~8hr wall-clock — see git log
+  for the cost breakdown). Until it's run at full scale, `check_reception` has no real data for
+  most titles, so the agent's reception commentary on those is unverified model knowledge, not
+  the sourced signal the whole project is built around.
+- RQ/Redis job queue not wired up — batch scripts run directly via CLI (same root cause as the
+  scheduling gap above)
 - `search_by_title` uses plain `ILIKE`, not proper fuzzy matching (e.g. pg_trgm)
 - No automated tests beyond the retrieval eval
