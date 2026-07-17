@@ -7,8 +7,9 @@ passable raw score. Full design doc: `Anime RAG Agent/Architecture.md` (Obsidian
 
 **Status:** full pipeline working end-to-end (ingestion → embeddings → review summarization →
 agent → API → frontend). Data source recently migrated from Jikan (the unofficial MyAnimeList
-API, shutting down October 2026) to AniList's GraphQL API — see [Known gaps](#known-gaps--next-steps)
-for what still needs a full-scale re-run against the new source.
+API, shutting down October 2026) to AniList's GraphQL API. Metadata (21,971 titles) and
+embeddings are fully re-ingested against the new source; review summarization still needs a
+full-scale re-run — see [Known gaps](#known-gaps--next-steps).
 
 ## Requirements
 
@@ -20,6 +21,7 @@ for what still needs a full-scale re-run against the new source.
 ## Setup
 
 ```bash
+cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -31,7 +33,7 @@ createdb anime_szn
 psql -d anime_szn -c "CREATE EXTENSION vector;"
 alembic upgrade head
 
-cd frontend
+cd ../frontend
 npm install
 ```
 
@@ -49,7 +51,8 @@ make install PG_CONFIG=$(brew --prefix postgresql@16)/bin/pg_config
 ## Running it
 
 ```bash
-# backend, from repo root
+# backend
+cd backend
 source venv/bin/activate
 uvicorn app.main:app --port 8000
 
@@ -60,7 +63,8 @@ npm run dev   # http://localhost:5173
 
 ## Data pipeline (offline/batch, run in this order)
 
-All idempotent — safe to re-run; each only processes rows missing that stage's output.
+All idempotent — safe to re-run; each only processes rows missing that stage's output. Run from
+`backend/` with the venv active.
 
 ```bash
 # 1. Metadata: fetch from AniList (GraphQL, year-sliced crawl), transform, upsert
@@ -96,36 +100,40 @@ stored reception summary so a divisive title is never surfaced silently.
 ## Project structure
 
 ```
-app/                        # FastAPI live app
-├── main.py                 # app instance, CORS, router registration
-├── config.py                # env-driven settings (pydantic-settings)
-├── db.py                    # SQLAlchemy engine/session
-├── schemas.py                # Pydantic request/response models
-├── search.py                 # semantic_search + popularity-aware reranking
-├── embeddings.py             # Voyage AI client (shared by app + ingestion)
-├── llm.py                    # Anthropic client + model ids (shared by app + ingestion)
-├── anilist_client.py          # live, on-demand AniList calls (streaming lookup) -- retried, no rate-limit pacing
-├── models/
-│   ├── anime.py               # `anime` table (metadata + pgvector embedding column)
-│   └── reception.py           # `reception_signals` table
-├── agent/
-│   ├── loop.py                # tool-use loop, system prompt(s), multi-turn history, spoiler mode
-│   └── tools.py               # tool definitions + executors (search_by_title, semantic_search, find_similar, check_reception, respond)
-└── routers/
-    ├── recommend.py            # POST /recommend
-    ├── anime.py                 # GET /anime/{id}
-    └── discover.py               # GET /discover (homepage "airing now")
+backend/
+├── requirements.txt
+├── alembic.ini
+├── .env.example
+├── app/                       # FastAPI live app
+│   ├── main.py                 # app instance, CORS, rate limiting, router registration
+│   ├── config.py                # env-driven settings (pydantic-settings)
+│   ├── db.py                    # SQLAlchemy engine/session
+│   ├── schemas.py                # Pydantic request/response models
+│   ├── search.py                 # semantic_search + popularity-aware reranking
+│   ├── embeddings.py             # Voyage AI client (shared by app + ingestion)
+│   ├── llm.py                    # Anthropic client + model ids (shared by app + ingestion)
+│   ├── rate_limit.py              # shared slowapi Limiter instance
+│   ├── anilist_client.py          # live, on-demand AniList calls (streaming lookup) -- retried, no rate-limit pacing
+│   ├── models/
+│   │   ├── anime.py               # `anime` table (metadata + pgvector embedding column)
+│   │   └── reception.py           # `reception_signals` table
+│   ├── agent/
+│   │   ├── loop.py                # tool-use loop, system prompt(s), multi-turn history, spoiler mode
+│   │   └── tools.py               # tool definitions + executors (search_by_title, semantic_search, find_similar, check_reception, respond)
+│   └── routers/
+│       ├── recommend.py            # POST /recommend (rate-limited)
+│       ├── anime.py                 # GET /anime/{id}
+│       └── discover.py               # GET /discover (homepage "airing now")
+├── ingestion/                 # offline batch pipeline (fetch -> transform -> load -> embed -> summarize)
+│   ├── anilist_client.py         # rate-limited bulk AniList client (retried, year-sliced crawl), separate from app/anilist_client.py
+│   ├── transform.py              # AniList response -> DB row
+│   ├── load.py                   # idempotent upsert
+│   ├── ingest.py                  # full/partial catalog crawl (CLI)
+│   ├── embed.py                   # Voyage embedding backfill (CLI)
+│   └── summarize_reception.py      # Claude Haiku batch review summarization (CLI)
+├── migrations/                # Alembic schema migrations
+└── eval/                       # retrieval-quality eval set + runner (validates semantic_search before trusting the agent)
 
-ingestion/                  # offline batch pipeline (fetch -> transform -> load -> embed -> summarize)
-├── anilist_client.py         # rate-limited bulk AniList client (retried, year-sliced crawl), separate from app/anilist_client.py
-├── transform.py              # AniList response -> DB row
-├── load.py                   # idempotent upsert
-├── ingest.py                  # full/partial catalog crawl (CLI)
-├── embed.py                   # Voyage embedding backfill (CLI)
-└── summarize_reception.py      # Claude Haiku batch review summarization (CLI)
-
-migrations/                 # Alembic schema migrations
-eval/                        # retrieval-quality eval set + runner (validates semantic_search before trusting the agent)
 frontend/                   # React (Vite)
 └── src/
     ├── App.jsx               # query box, chat thread, discovery grid, spotlight/grid cards, spoiler toggle
