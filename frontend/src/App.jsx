@@ -7,10 +7,11 @@ const API_BASE = "http://localhost:8000";
 const PLACEHOLDER_EXAMPLES = [
   "I'm new to anime, what should I watch first?",
   "A wholesome slice-of-life show...",
-  "A psychological thriller with a twist...",
+  "Why is [Insert Title] so hated?",
   "More like Death Note...",
   "A short series I can binge in a weekend...",
-  "I'm new to anime, what should I watch first?",
+  "Something I can watch in public and not get weird looks...",
+  "Why is [Insert Title] so popular?",
 ];
 const PLACEHOLDER_INTERVAL_MS = 3000;
 
