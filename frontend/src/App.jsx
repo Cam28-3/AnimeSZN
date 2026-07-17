@@ -5,7 +5,7 @@ import myLogo from "./animeszn_logo_white_text.png";
 const API_BASE = "http://localhost:8000";
 
 const PLACEHOLDER_EXAMPLES = [
-  "Something like Attack on Titan...",
+  "I'm new to anime, what should I watch first?",
   "A wholesome slice-of-life show...",
   "A psychological thriller with a twist...",
   "More like Death Note...",
