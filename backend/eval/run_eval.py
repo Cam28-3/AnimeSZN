@@ -18,6 +18,8 @@ from app.search import SearchFilters, semantic_search_by_vector
 EVAL_SET_PATH = Path(__file__).parent / "eval_set.json"
 
 
+# Embeds every eval query in one request, runs each through semantic_search_by_vector
+# unfiltered, and reports whether the expected anime lands in the top-k.
 def run(k: int) -> None:
     cases = json.loads(EVAL_SET_PATH.read_text())
     query_vectors = embed_queries([case["query"] for case in cases])  # one request, avoids per-call rate limits

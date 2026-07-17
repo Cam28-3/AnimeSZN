@@ -9,6 +9,9 @@ from app.schemas import RecommendationOut, RecommendRequest, RecommendResponse
 router = APIRouter()
 
 
+# Main app entry point: runs the full agent tool-use loop for a user query and shapes the
+# result into the response schema. The only route that spends real Anthropic money, hence
+# the rate limit.
 @router.post("/recommend", response_model=RecommendResponse)
 @limiter.limit("10/minute")
 def recommend(request: Request, body: RecommendRequest, db: Session = Depends(get_db)) -> RecommendResponse:

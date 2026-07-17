@@ -95,6 +95,7 @@ TOOL_DEFINITIONS = [
 ]
 
 
+# Maps a tool call's raw filter kwargs (as sent by the model) onto a SearchFilters instance.
 def _filters_from_input(input: dict) -> SearchFilters:
     return SearchFilters(
         status=input.get("status"),
@@ -106,6 +107,8 @@ def _filters_from_input(input: dict) -> SearchFilters:
     )
 
 
+# Shared shaping of SearchResult objects into the plain-dict form returned to the model as
+# tool output (JSON-serializable, only the fields the agent needs to reason about).
 def _serialize_results(results) -> list[dict]:
     return [
         {
@@ -120,6 +123,7 @@ def _serialize_results(results) -> list[dict]:
     ]
 
 
+# search_by_title tool executor: substring/fuzzy title lookup, most-popular matches first.
 def tool_search_by_title(db: Session, query: str, limit: int = 5) -> list[dict]:
     stmt = (
         select(Anime)
@@ -134,11 +138,14 @@ def tool_search_by_title(db: Session, query: str, limit: int = 5) -> list[dict]:
     ]
 
 
+# semantic_search tool executor: mood/theme-based retrieval over synopsis embeddings.
 def tool_semantic_search(db: Session, query_text: str, **filter_kwargs) -> list[dict]:
     results = semantic_search(db, query_text, filters=_filters_from_input(filter_kwargs), limit=8)
     return _serialize_results(results)
 
 
+# find_similar tool executor: nearest-neighbor lookup using a known anime's own embedding as
+# the query vector, excluding the anime itself from its own results.
 def tool_find_similar(db: Session, anime_id: int, **filter_kwargs) -> list[dict] | dict:
     anime = db.get(Anime, anime_id)
     if anime is None or anime.synopsis_embedding is None:
@@ -148,6 +155,8 @@ def tool_find_similar(db: Session, anime_id: int, **filter_kwargs) -> list[dict]
     return _serialize_results(results)
 
 
+# check_reception tool executor: the reception-signal lookup the agent is required to call
+# before recommending any title, so divisive titles never get surfaced silently.
 def tool_check_reception(db: Session, anime_id: int) -> dict:
     rs = db.get(ReceptionSignal, anime_id)
     if rs is None:
@@ -174,6 +183,8 @@ TOOL_EXECUTORS = {
 }
 
 
+# Dispatches a tool-use block from the model to its executor by name. Called from the agent's
+# tool-round loop for every tool call the model makes.
 def execute_tool(db: Session, name: str, tool_input: dict):
     executor = TOOL_EXECUTORS[name]
     return executor(db, **tool_input)

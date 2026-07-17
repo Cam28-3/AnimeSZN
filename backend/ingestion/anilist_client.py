@@ -54,6 +54,8 @@ query ($id: Int, $perPage: Int) {
 """
 
 
+# Transient-failure classifier for the retry decorator: network errors and rate-limit/server
+# status codes are retried, anything else (bad query, auth, etc.) is not.
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.TransportError):
         return True
@@ -66,6 +68,9 @@ def _is_retryable(exc: BaseException) -> bool:
     stop=stop_after_attempt(6),
     reraise=True,
 )
+# Shared low-level POST for every GraphQL query in this module: retries transient failures,
+# paces requests to stay under AniList's rate limit, and normalizes in-band GraphQL errors
+# into a raised exception so the retry logic can see them.
 def _post(query: str, variables: dict) -> dict:
     response = _client.post("", json={"query": query, "variables": variables})
     response.raise_for_status()
@@ -78,6 +83,8 @@ def _post(query: str, variables: dict) -> dict:
     return payload["data"]
 
 
+# Generates the (from, to) FuzzyDateInt bounds for each year's crawl window, from start_year
+# through LATEST_YEAR.
 def _year_windows(start_year: int):
     for year in range(start_year, LATEST_YEAR + 1):
         # Pad by 1 on both sides: covers fuzzy year-only dates (stored as YYYY0000, which a
@@ -101,6 +108,8 @@ def iter_anime(start_year: int = EARLIEST_YEAR):
             page += 1
 
 
+# Fetches up to max_reviews review bodies for one title, used by summarize_reception.py to
+# build the text Claude Haiku summarizes into a reception signal.
 def fetch_reviews(anilist_id: int, max_reviews: int = 6) -> list[str]:
     data = _post(REVIEWS_QUERY, {"id": anilist_id, "perPage": max_reviews})
     media = data.get("Media")

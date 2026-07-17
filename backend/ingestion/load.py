@@ -19,6 +19,8 @@ _UPSERT_COLUMNS = [
 ]
 
 
+# Batch upsert of transformed anime rows, keyed by AniList id -- insert new titles, update
+# existing ones on every listed column.
 def upsert_anime(db: Session, rows: list[dict]) -> None:
     if not rows:
         return

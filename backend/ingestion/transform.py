@@ -16,6 +16,7 @@ MAX_TAGS = 10
 MIN_TAG_RANK = 40  # AniList tag relevance is 0-100; drop low-confidence tags as noise
 
 
+# Strips HTML tags (AniList descriptions often contain <br>/<i>/etc.) and collapses whitespace.
 def clean_text(text: str | None) -> str | None:
     if not text:
         return None
@@ -24,6 +25,8 @@ def clean_text(text: str | None) -> str | None:
     return text or None
 
 
+# Converts AniList's {year, month, day} FuzzyDate (month/day can be missing) into a concrete
+# date, defaulting missing month/day to the 1st.
 def parse_fuzzy_date(fuzzy: dict | None) -> date | None:
     if not fuzzy or not fuzzy.get("year"):
         return None
@@ -39,6 +42,8 @@ def select_tags(raw_tags: list[dict]) -> list[str]:
     return [t["name"] for t in candidates if (t.get("rank") or 0) >= MIN_TAG_RANK][:MAX_TAGS]
 
 
+# Main entry point: converts one raw AniList media entry into the dict shape ingestion/load.py
+# upserts into the anime table (title preference, score-scale conversion, tag filtering, etc.).
 def transform_anime(entry: dict) -> dict:
     title = entry.get("title") or {}
     display_title = title.get("english") or title.get("romaji") or f"Untitled ({entry['id']})"

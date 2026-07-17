@@ -3,6 +3,8 @@ import "./App.css";
 
 const API_BASE = "http://localhost:8000";
 
+// Fallback link to a title's AniList page, shown alongside (or instead of) streaming platform
+// links -- always available since every ingested title has an AniList id.
 function AniListPill({ url }) {
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="watch-pill watch-pill-anilist">
@@ -11,6 +13,8 @@ function AniListPill({ url }) {
   );
 }
 
+// Lazy "Where to watch" expander shown on every card -- only hits GET /anime/{id} (the live
+// AniList streaming-links lookup) once the user actually clicks, not on initial render.
 function WhereToWatch({ animeId }) {
   const [state, setState] = useState("idle"); // idle | loading | loaded | error | unavailable
   const [platforms, setPlatforms] = useState([]);
@@ -81,6 +85,7 @@ function WhereToWatch({ animeId }) {
   );
 }
 
+// Standard grid card for a recommendation (used when a turn has multiple recommendations).
 function RecommendationCard({ rec }) {
   return (
     <div className="card">
@@ -102,6 +107,8 @@ function RecommendationCard({ rec }) {
   );
 }
 
+// Wide single-title layout used when a turn has exactly one recommendation, instead of
+// cramming it into the multi-item grid.
 function SpotlightCard({ rec }) {
   return (
     <div className="card spotlight-card">
@@ -123,6 +130,8 @@ function SpotlightCard({ rec }) {
   );
 }
 
+// Homepage discovery-grid card (currently-airing titles) -- clicking it prefills the query
+// box via onPick rather than issuing its own recommend request.
 function DiscoverCard({ item, onPick }) {
   return (
     <div className="card discover-card">
@@ -143,6 +152,8 @@ function DiscoverCard({ item, onPick }) {
   );
 }
 
+// Root component: query box, spoiler toggle, homepage discovery grid, and the growing list of
+// conversation turns. All state is client-side only -- no backend session storage.
 function App() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -160,6 +171,8 @@ function App() {
       .catch(() => setDiscoverItems([]));
   }, []);
 
+  // Expands/collapses a past conversation turn's recommendations (the latest turn is always
+  // shown expanded regardless of this state -- see isExpanded below).
   function toggleTurn(index) {
     setExpandedTurns((prev) => {
       const next = new Set(prev);
@@ -169,11 +182,15 @@ function App() {
     });
   }
 
+  // Clicking a discovery-grid card prefills a "something like X" query rather than
+  // recommending it directly, so the agent still reasons about it (tool calls, reception check).
   function pickDiscoverItem(title) {
     setQuery(`something like ${title}`);
     inputRef.current?.focus();
   }
 
+  // Submits the query to POST /recommend, sending prior turns as history (id + title only, not
+  // full recommendation objects) so the agent has multi-turn context, then appends the new turn.
   async function handleSubmit(e) {
     e.preventDefault();
     if (!query.trim() || loading) return;

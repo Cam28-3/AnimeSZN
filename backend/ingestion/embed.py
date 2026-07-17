@@ -19,6 +19,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
+# Finds anime rows needing embeddings (all rows if --reembed-all), embeds them in batches, and
+# commits incrementally so a mid-run failure doesn't lose already-embedded rows.
 def run(batch_size: int, reembed_all: bool) -> None:
     db = SessionLocal()
     try:

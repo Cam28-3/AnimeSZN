@@ -21,6 +21,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 
+# Crawls AniList year by year, transforms and upserts in batches (tolerating per-entry and
+# per-batch failures without losing prior progress), then finalizes popularity ranks.
 def run(batch_size: int, start_year: int) -> None:
     db = SessionLocal()
     batch: list[dict] = []

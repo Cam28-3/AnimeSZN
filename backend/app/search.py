@@ -36,6 +36,9 @@ class SearchResult:
     similarity: float  # 1 - cosine distance; higher is more similar
 
 
+# Convenience wrapper for query-text-based search: embeds the text, then delegates to the
+# vector-based search below. Used when the caller only has a natural-language query, not a
+# precomputed embedding.
 def semantic_search(db: Session, query_text: str, filters: SearchFilters | None = None, limit: int = 10) -> list[SearchResult]:
     query_vector = embed_query(query_text)
     return semantic_search_by_vector(db, query_vector, filters=filters, limit=limit)
@@ -48,6 +51,9 @@ def _popularity_boost(popularity_rank: int | None) -> float:
     return max(0.0, 1 - math.log(popularity_rank) / math.log(POPULARITY_RANK_CEILING))
 
 
+# Core retrieval: pgvector cosine-distance search against an already-embedded query vector,
+# with optional structured filters (status/score/episodes/year), then reranked by a blend of
+# similarity and popularity. This is what both semantic_search and find_similar ultimately call.
 def semantic_search_by_vector(
     db: Session, query_vector: list[float], filters: SearchFilters | None = None, limit: int = 10
 ) -> list[SearchResult]:

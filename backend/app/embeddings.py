@@ -16,6 +16,9 @@ _client = voyageai.Client(api_key=settings.voyage_api_key)
     stop=stop_after_attempt(8),
     reraise=True,
 )
+# Low-level single-request call to Voyage's embed API for one chunk (<= MAX_BATCH_SIZE texts).
+# input_type is "document" for catalog rows or "query" for user/eval queries -- Voyage tunes
+# the embedding differently for each.
 def _embed(chunk: list[str], input_type: str) -> list[list[float]]:
     result = _client.embed(chunk, model=EMBEDDING_MODEL, input_type=input_type)
     return result.embeddings
@@ -44,6 +47,8 @@ def embed_queries(texts: list[str]) -> list[list[float]]:
     return embeddings
 
 
+# Assembles the text that actually gets embedded for an anime row -- synopsis plus
+# labeled tag/genre lists, falling back to just the title if everything else is empty.
 def build_embedding_text(title: str, synopsis: str | None, genres: list[str], tags: list[str]) -> str:
     parts = [synopsis or ""]
     if tags:

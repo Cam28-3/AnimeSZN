@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Full detail view for one title: stored metadata + reception data from the DB, plus a live
+# AniList streaming-links lookup (degrades to streaming_unavailable rather than failing the
+# whole request if that call errors).
 @router.get("/anime/{anime_id}", response_model=AnimeDetailOut)
 def get_anime(anime_id: int, db: Session = Depends(get_db)) -> AnimeDetailOut:
     anime = db.get(Anime, anime_id)

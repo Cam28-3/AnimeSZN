@@ -25,6 +25,7 @@ app.include_router(anime.router)
 app.include_router(discover.router)
 
 
+# Liveness check -- exempt from CORS/auth concerns, used by deploy platforms for healthchecks.
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}

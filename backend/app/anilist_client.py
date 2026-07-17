@@ -14,6 +14,8 @@ query ($id: Int) {
 """
 
 
+# Transient-failure classifier shared by the retry decorator below: network errors and
+# rate-limit/server-error status codes are worth retrying, everything else isn't.
 def _is_retryable(exc: BaseException) -> bool:
     if isinstance(exc, httpx.TransportError):
         return True
@@ -26,6 +28,8 @@ def _is_retryable(exc: BaseException) -> bool:
     stop=stop_after_attempt(3),
     reraise=True,
 )
+# Fires the streaming-links GraphQL query for one anime id, with a short retry/backoff for
+# transient failures.
 def _post(anime_id: int) -> httpx.Response:
     response = _client.post("", json={"query": STREAMING_QUERY, "variables": {"id": anime_id}})
     response.raise_for_status()

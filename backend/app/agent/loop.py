@@ -69,6 +69,8 @@ class AgentResult:
     recommendations: list[RecommendationCard]
 
 
+# Generates a caveat string from stored reception data, for use when the model recommends
+# a divisive title without writing its own caveat.
 def _fallback_caveat(reception: ReceptionSignal) -> str:
     flag_label = reception.community_flag.value.replace("_", " ")
     if reception.reception_summary:
@@ -76,6 +78,8 @@ def _fallback_caveat(reception: ReceptionSignal) -> str:
     return f"Reception is {flag_label} per community sentiment data."
 
 
+# Turns the model's raw `respond` tool-call input into the AgentResult the API layer returns --
+# resolves each recommended anime_id against the DB and backstops missing reception caveats.
 def _build_result(db: Session, respond_input: dict) -> AgentResult:
     recommendations = []
     for rec in respond_input.get("recommendations", []):
@@ -108,6 +112,8 @@ def _build_result(db: Session, respond_input: dict) -> AgentResult:
     return AgentResult(message=respond_input.get("message", ""), recommendations=recommendations)
 
 
+# Converts prior conversation turns (query + agent message + recommendations) into the
+# user/assistant message list format the Claude API expects, so the agent has multi-turn context.
 def _condense_history(history: list[dict]) -> list[dict]:
     messages = []
     for turn in history[-MAX_HISTORY_TURNS:]:
@@ -121,6 +127,9 @@ def _condense_history(history: list[dict]) -> list[dict]:
     return messages
 
 
+# Makes one Claude API call with the tool definitions attached, picking the spoiler-free or
+# normal system prompt variant. tool_choice lets callers force a specific tool (used to force
+# `respond` once the round cap is hit).
 def _run_tool_round(messages: list, spoiler_free: bool, tool_choice: dict | None = None):
     kwargs = {}
     if tool_choice is not None:
@@ -136,6 +145,9 @@ def _run_tool_round(messages: list, spoiler_free: bool, tool_choice: dict | None
     )
 
 
+# Entry point for the agent: runs the tool-use loop (up to MAX_TOOL_ROUNDS) until the model
+# calls `respond`, executing whatever tools it requests along the way, then forces finalization
+# if the round cap is reached without one.
 def run_agent(
     db: Session, user_query: str, history: list[dict] | None = None, spoiler_free: bool = False
 ) -> AgentResult:

@@ -39,6 +39,8 @@ SYSTEM_PROMPT = (
 )
 
 
+# Maps Haiku's sentiment_ratio score onto the CommunityFlag enum the agent's check_reception
+# tool surfaces -- this is what actually triggers the "never recommend silently" behavior.
 def derive_community_flag(sentiment_ratio: float | None) -> CommunityFlag:
     if sentiment_ratio is None:
         return CommunityFlag.none
@@ -49,6 +51,8 @@ def derive_community_flag(sentiment_ratio: float | None) -> CommunityFlag:
     return CommunityFlag.none
 
 
+# Builds one Message Batches API request entry for a title -- custom_id is the anime_id so
+# apply_batch_results can map results back to rows.
 def build_batch_request(anime_id: int, title: str, reviews: list[str]) -> dict:
     review_text = "\n\n".join(f"Review {i+1}: {r[:MAX_REVIEW_CHARS]}" for i, r in enumerate(reviews))
     return {
@@ -62,6 +66,7 @@ def build_batch_request(anime_id: int, title: str, reviews: list[str]) -> dict:
     }
 
 
+# Writes (or updates) one anime's reception_signals row from a summary/sentiment_ratio pair.
 def upsert_reception(db, anime_id: int, summary: str | None, sentiment_ratio: float | None) -> None:
     flag = derive_community_flag(sentiment_ratio)
     existing = db.get(ReceptionSignal, anime_id)
@@ -80,12 +85,15 @@ def upsert_reception(db, anime_id: int, summary: str | None, sentiment_ratio: fl
         )
 
 
+# Fetches and cleans review text for one title, dropping any reviews that end up empty after
+# HTML-stripping.
 def collect_review_texts(anime_id: int, max_reviews: int) -> list[str]:
     raw_reviews = fetch_reviews(anime_id, max_reviews=max_reviews)
     cleaned = [clean_text(r) for r in raw_reviews]
     return [r for r in cleaned if r]
 
 
+# Submits the whole set of per-title requests as one async Anthropic Message Batch job.
 def submit_batch(requests: list[dict]) -> str:
     batch = client.messages.batches.create(requests=requests)
     logger.info("Submitted batch %s with %d requests", batch.id, len(requests))
@@ -113,6 +121,8 @@ def extract_json(raw_text: str) -> dict:
     return json.loads(raw_text[start : end + 1])
 
 
+# Walks a finished batch's results, parses each Haiku response, and upserts reception_signals
+# rows -- skips (with a warning, not a crash) any entry that failed or came back unparseable.
 def apply_batch_results(db, batch_id: str) -> int:
     processed = 0
     for result in client.messages.batches.results(batch_id):
@@ -155,6 +165,9 @@ def fetch_all_reviews(rows: list[Anime], max_reviews: int) -> tuple[list[dict], 
     return batch_requests, no_review_ids
 
 
+# Orchestrates the full job: resume-mode just polls/applies an existing batch; otherwise finds
+# anime missing reception data, fetches reviews, submits a Haiku batch, and applies results
+# (or prints --resume instructions if the batch is still running at --poll-timeout).
 def run(max_reviews: int, reprocess_all: bool, poll_interval: int, poll_timeout: int, resume_batch_id: str | None) -> None:
     db = SessionLocal()
     try:
