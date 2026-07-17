@@ -6,10 +6,10 @@
   --text-h: #f5f2fa;
   --text-dim: #6f6a7d;
   --border: #2c2733;
-  --accent: #ff3d5a;
+  --accent: #5b21b6; /* matches the logo artwork's violet */
   --accent-2: #ffb020;
-  --accent-bg: rgba(255, 61, 90, 0.12);
-  --danger: #ff3d5a;
+  --accent-bg: rgba(91, 33, 182, 0.12);
+  --danger: #ff3d5a; /* kept red -- distinct from the brand accent so error states still read as errors */
 
   --display: 'Bebas Neue', 'Arial Narrow', sans-serif;
   --sans: 'Space Grotesk', 'Segoe UI', sans-serif;
@@ -31,9 +31,9 @@
 body {
   margin: 0;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 61, 90, 0.12), transparent),
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(91, 33, 182, 0.16), transparent),
     var(--bg);
-  min-height: 100svh;
+  min-height: 100svh; /* glow alpha (0.16) is intentionally a bit stronger than --accent-bg (0.12) */
 }
 
 #root {

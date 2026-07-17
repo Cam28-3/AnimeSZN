@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
+import myLogo from "./animeszn_logo_white_text.png";
 
 const API_BASE = "http://localhost:8000";
 
@@ -224,8 +225,8 @@ function App() {
   return (
     <div className="app">
       <div className="header-row">
-        <h1 className="wordmark">
-          ANIME<span className="wordmark-accent">SZN</span>
+        <h1 className="logo">
+          <img src={myLogo} alt="Anime SZN" className="logo-image" />
         </h1>
         {turns.length > 0 && (
           <button type="button" className="reset-button" onClick={() => setTurns([])}>
@@ -233,7 +234,7 @@ function App() {
           </button>
         )}
       </div>
-      <p className="tagline">Find or discover anime — the agent checks community reception before recommending.</p>
+      <p className="tagline">Find something to watch, where to watch it, and what the world thinks.</p>
 
       <form onSubmit={handleSubmit} className="query-form">
         <input
@@ -241,7 +242,7 @@ function App() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="e.g. something like Death Note, or a wholesome slice-of-life show"
+          placeholder="ex. \I'm new to anime, recommend something to watch.\"
           disabled={loading}
         />
         <button type="submit" disabled={loading || !query.trim()}>
