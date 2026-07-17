@@ -4,6 +4,16 @@ import myLogo from "./animeszn_logo_white_text.png";
 
 const API_BASE = "http://localhost:8000";
 
+const PLACEHOLDER_EXAMPLES = [
+  "Something like Attack on Titan...",
+  "A wholesome slice-of-life show...",
+  "A psychological thriller with a twist...",
+  "More like Death Note...",
+  "A short series I can binge in a weekend...",
+  "I'm new to anime, what should I watch first?",
+];
+const PLACEHOLDER_INTERVAL_MS = 3000;
+
 // Fallback link to a title's AniList page, shown alongside (or instead of) streaming platform
 // links -- always available since every ingested title has an AniList id.
 function AniListPill({ url }) {
@@ -163,6 +173,7 @@ function App() {
   const [expandedTurns, setExpandedTurns] = useState(new Set());
   const [discoverItems, setDiscoverItems] = useState([]);
   const [spoilerFree, setSpoilerFree] = useState(true);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -171,6 +182,16 @@ function App() {
       .then(setDiscoverItems)
       .catch(() => setDiscoverItems([]));
   }, []);
+
+  // Cycles the search box's placeholder through a few example queries -- paused while the
+  // user has actually typed something, since the placeholder is hidden then anyway.
+  useEffect(() => {
+    if (query) return;
+    const id = setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % PLACEHOLDER_EXAMPLES.length);
+    }, PLACEHOLDER_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [query]);
 
   // Expands/collapses a past conversation turn's recommendations (the latest turn is always
   // shown expanded regardless of this state -- see isExpanded below).
@@ -242,7 +263,7 @@ function App() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="ex. \I'm new to anime, recommend something to watch.\"
+          placeholder={PLACEHOLDER_EXAMPLES[placeholderIndex]}
           disabled={loading}
         />
         <button type="submit" disabled={loading || !query.trim()}>
