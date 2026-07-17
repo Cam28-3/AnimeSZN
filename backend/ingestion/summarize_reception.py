@@ -9,12 +9,18 @@ Idempotent — only processes anime missing a reception_signals row unless --rep
 
 The Batch API is async (can take minutes to hours). If it hasn't finished by --poll-timeout,
 the batch id is printed so the job can be resumed later with --resume.
+
+The review-fetch phase (before batch submission) can take many hours for a full catalog and
+checkpoints its progress to .reception_fetch_checkpoint.jsonl -- if the process is interrupted
+before a batch is submitted, just re-run the same command and it picks up where it left off
+instead of re-fetching everything.
 """
 
 import argparse
 import json
 import logging
 import time
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -29,6 +35,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 logger = logging.getLogger(__name__)
 
 MAX_REVIEW_CHARS = 600
+# The fetch phase can take many hours for a full catalog; this checkpoint lets a restart skip
+# titles already fetched instead of redoing the whole (free but slow) AniList crawl. Cleared
+# once a batch is successfully submitted -- from that point on, --resume <batch_id> is the
+# right recovery path, not the checkpoint.
+CHECKPOINT_PATH = Path(__file__).parent / ".reception_fetch_checkpoint.jsonl"
 SYSTEM_PROMPT = (
     "You analyze anime fan reviews to summarize community reception. "
     "Given the anime title and a sample of user reviews, respond with ONLY a JSON object "
@@ -93,6 +104,28 @@ def collect_review_texts(anime_id: int, max_reviews: int) -> list[str]:
     return [r for r in cleaned if r]
 
 
+# Loads already-fetched titles from a prior interrupted run. Only successful fetches are
+# checkpointed (see fetch_all_reviews), so permanently-failed titles are naturally retried.
+def load_checkpoint() -> dict[int, list[str]]:
+    if not CHECKPOINT_PATH.exists():
+        return {}
+    checkpoint = {}
+    with CHECKPOINT_PATH.open() as f:
+        for line in f:
+            entry = json.loads(line)
+            checkpoint[entry["anime_id"]] = entry["reviews"]
+    return checkpoint
+
+
+def append_checkpoint(anime_id: int, reviews: list[str]) -> None:
+    with CHECKPOINT_PATH.open("a") as f:
+        f.write(json.dumps({"anime_id": anime_id, "reviews": reviews}) + "\n")
+
+
+def clear_checkpoint() -> None:
+    CHECKPOINT_PATH.unlink(missing_ok=True)
+
+
 # Submits the whole set of per-title requests as one async Anthropic Message Batch job.
 def submit_batch(requests: list[dict]) -> str:
     batch = client.messages.batches.create(requests=requests)
@@ -145,23 +178,40 @@ def apply_batch_results(db, batch_id: str) -> int:
 def fetch_all_reviews(rows: list[Anime], max_reviews: int) -> tuple[list[dict], list[int]]:
     """Returns (batch_requests, no_review_ids). Titles that fail permanently (retries
     exhausted) are logged and skipped rather than aborting the whole run -- they have no
-    reception_signals row written, so the idempotent query above picks them back up next time."""
+    reception_signals row written, so the idempotent query above picks them back up next time.
+    Already-fetched titles from a prior interrupted run are loaded from CHECKPOINT_PATH and
+    skipped; newly-fetched titles are appended to it as they complete, so a crash mid-run only
+    costs the titles fetched since the last checkpoint write, not the whole run."""
+    checkpoint = load_checkpoint()
+    if checkpoint:
+        logger.info("Resuming from checkpoint: %d titles already fetched", len(checkpoint))
+
     batch_requests = []
     no_review_ids = []
     skipped_count = 0
+    resumed_count = 0
     for i, row in enumerate(rows, start=1):
-        try:
-            reviews = collect_review_texts(row.id, max_reviews)
-        except Exception:
-            logger.exception("Giving up on anime %s after retries -- skipping", row.id)
-            skipped_count += 1
-            continue
+        if row.id in checkpoint:
+            reviews = checkpoint[row.id]
+            resumed_count += 1
+        else:
+            try:
+                reviews = collect_review_texts(row.id, max_reviews)
+            except Exception:
+                logger.exception("Giving up on anime %s after retries -- skipping", row.id)
+                skipped_count += 1
+                continue
+            append_checkpoint(row.id, reviews)
+
         if reviews:
             batch_requests.append(build_batch_request(row.id, row.title, reviews))
         else:
             no_review_ids.append(row.id)
         if i % 250 == 0:
-            logger.info("Progress: %d/%d anime processed (%d skipped so far)", i, len(rows), skipped_count)
+            logger.info(
+                "Progress: %d/%d anime processed (%d skipped, %d resumed from checkpoint)",
+                i, len(rows), skipped_count, resumed_count,
+            )
     return batch_requests, no_review_ids
 
 
@@ -201,9 +251,13 @@ def run(max_reviews: int, reprocess_all: bool, poll_interval: int, poll_timeout:
 
         if not batch_requests:
             logger.info("No batch requests to submit.")
+            clear_checkpoint()  # fetch phase is fully done, nothing left for it to protect
             return
 
         batch_id = submit_batch(batch_requests)
+        # From here on, --resume <batch_id> is the recovery path (the batch lives on
+        # Anthropic's servers independent of this process) -- the checkpoint's job is done.
+        clear_checkpoint()
         ended = poll_batch(batch_id, poll_interval, poll_timeout)
         if not ended:
             logger.info("Batch %s still processing. Re-run with --resume %s to finish later.", batch_id, batch_id)
