@@ -6,10 +6,10 @@ community reception before recommending a title — rather than surfacing anythi
 passable raw score. Full design doc: `Anime RAG Agent/Architecture.md` (Obsidian).
 
 **Status:** full pipeline working end-to-end (ingestion → embeddings → review summarization →
-agent → API → frontend). Data source recently migrated from Jikan (the unofficial MyAnimeList
-API, shutting down October 2026) to AniList's GraphQL API. Metadata (21,971 titles) and
-embeddings are fully re-ingested against the new source; review summarization still needs a
-full-scale re-run — see [Known gaps](#known-gaps--next-steps).
+agent → API → frontend). Data source migrated from Jikan (the unofficial MyAnimeList API,
+shutting down October 2026) to AniList's GraphQL API. Metadata (21,971 titles), embeddings, and
+review-based reception data are all fully re-ingested against the new source — see
+[Known gaps](#known-gaps--next-steps) for what's still outstanding.
 
 ## Requirements
 
@@ -143,20 +143,16 @@ frontend/                   # React (Vite)
 
 ## Known gaps / next steps
 
-- **Full-catalog ingest needs a fresh run against AniList.** The previous ~30,200-title catalog
-  was Jikan-sourced and is stale/being replaced now that the pipeline points at AniList instead
-  (Jikan is shutting down October 2026). `ingestion/ingest.py` needs a full unattended run
-  (year-sliced crawl, ~30 req/min) before the catalog is back to full breadth.
 - **No scheduled catalog refresh.** Ingestion/embeddings/reception are only ever run manually —
   there's no cron/launchd job or RQ/Redis schedule re-running them (e.g. weekly/monthly, as the
   original architecture doc intended). The catalog is a static snapshot from whenever someone
   last ran `ingestion/ingest.py` by hand; new releases, score changes, and status transitions
-  (e.g. airing → finished) won't show up until it's manually re-run.
-- Review summarization (`ingestion/summarize_reception.py`) needs a full-scale re-run against
-  AniList reviews once the catalog is re-ingested (~$25 est. cost, ~8-12hr wall-clock, same
-  order of magnitude as the original Jikan-based run). Until it's run at full scale,
-  `check_reception` has no real data for most titles, so the agent's reception commentary on
-  those is unverified model knowledge, not the sourced signal the whole project is built around.
+  (e.g. airing → finished) won't show up until it's manually re-run. Same applies to
+  `ingestion/summarize_reception.py` — reception data for newly-released titles or updated
+  review sentiment won't refresh on its own either.
+- The review-fetch phase of `ingestion/summarize_reception.py` checkpoints its progress
+  (`.reception_fetch_checkpoint.jsonl`) since a full-catalog run's fetch phase alone takes many
+  hours — a re-run after an interruption resumes instead of re-fetching everything.
 - RQ/Redis job queue not wired up — batch scripts run directly via CLI (same root cause as the
   scheduling gap above)
 - `search_by_title` uses plain `ILIKE`, not proper fuzzy matching (e.g. pg_trgm)
