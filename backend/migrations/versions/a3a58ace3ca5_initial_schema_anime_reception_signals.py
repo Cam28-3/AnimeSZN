@@ -1,7 +1,7 @@
 """initial schema: anime, reception_signals
 
 Revision ID: a3a58ace3ca5
-Revises: 
+Revises: 59d8c41aa8a1
 Create Date: 2026-07-08 14:23:38.497144
 
 """
@@ -14,7 +14,7 @@ import pgvector.sqlalchemy
 
 # revision identifiers, used by Alembic.
 revision: str = 'a3a58ace3ca5'
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = '59d8c41aa8a1'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
