@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import myLogo from "./animeszn_logo_white_text.png";
-
-const API_BASE = "http://localhost:8000";
+import AccessGate from "./AccessGate";
+import { apiFetch, getStoredKey, UnauthorizedError } from "./api";
 
 const PLACEHOLDER_EXAMPLES = [
   "I'm new to anime, what should I watch first?",
@@ -36,7 +36,7 @@ function WhereToWatch({ animeId }) {
     if (state === "loading") return;
     setState("loading");
     try {
-      const res = await fetch(`${API_BASE}/anime/${animeId}`);
+      const res = await apiFetch(`/anime/${animeId}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setAnilistUrl(data.anilist_url);
@@ -46,7 +46,11 @@ function WhereToWatch({ animeId }) {
       }
       setPlatforms(data.streaming);
       setState("loaded");
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        window.location.reload();
+        return;
+      }
       setState("error");
     }
   }
@@ -175,14 +179,22 @@ function App() {
   const [discoverItems, setDiscoverItems] = useState([]);
   const [spoilerFree, setSpoilerFree] = useState(true);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [unlocked, setUnlocked] = useState(() => !!getStoredKey());
   const inputRef = useRef(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/discover`)
+    if (!unlocked) return; // avoid a fetch-401-reload loop before a key is even entered
+    apiFetch("/discover")
       .then((res) => (res.ok ? res.json() : []))
       .then(setDiscoverItems)
-      .catch(() => setDiscoverItems([]));
-  }, []);
+      .catch((err) => {
+        if (err instanceof UnauthorizedError) {
+          window.location.reload();
+          return;
+        }
+        setDiscoverItems([]);
+      });
+  }, [unlocked]);
 
   // Cycles the search box's placeholder through a few example queries -- paused while the
   // user has actually typed something, since the placeholder is hidden then anyway.
@@ -193,6 +205,10 @@ function App() {
     }, PLACEHOLDER_INTERVAL_MS);
     return () => clearInterval(id);
   }, [query]);
+
+  if (!unlocked) {
+    return <AccessGate onUnlocked={() => setUnlocked(true)} />;
+  }
 
   // Expands/collapses a past conversation turn's recommendations (the latest turn is always
   // shown expanded regardless of this state -- see isExpanded below).
@@ -228,7 +244,7 @@ function App() {
     }));
 
     try {
-      const res = await fetch(`${API_BASE}/recommend`, {
+      const res = await apiFetch("/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, history, spoiler_free: spoilerFree }),
@@ -238,6 +254,10 @@ function App() {
       setTurns((prev) => [...prev, { query, message: data.message, recommendations: data.recommendations }]);
       setQuery("");
     } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        window.location.reload();
+        return;
+      }
       setError(err.message);
     } finally {
       setLoading(false);
