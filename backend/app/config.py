@@ -22,6 +22,13 @@ class Settings(BaseSettings):
             value = "postgresql+psycopg2://" + value[len("postgresql://") :]
         return value
 
+    @field_validator("access_key", mode="after")
+    @classmethod
+    def _strip_access_key(cls, value: str) -> str:
+        # Same copy-paste trailing whitespace/newline issue as DATABASE_URL -- strip it so a
+        # correctly-typed key isn't rejected by a stray character baked into the Railway value.
+        return value.strip()
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
