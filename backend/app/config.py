@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -10,6 +11,16 @@ class Settings(BaseSettings):
     access_key: str = ""
     # Comma-separated list of allowed frontend origins for CORS.
     cors_origins: str = "http://localhost:5173"
+
+    @field_validator("database_url", mode="after")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        # Strip stray whitespace/newlines from copy-pasted values, and accept the plain
+        # postgresql:// scheme Railway hands out -- psycopg2 needs the +psycopg2 driver segment.
+        value = value.strip()
+        if value.startswith("postgresql://"):
+            value = "postgresql+psycopg2://" + value[len("postgresql://") :]
+        return value
 
     @property
     def cors_origin_list(self) -> list[str]:
